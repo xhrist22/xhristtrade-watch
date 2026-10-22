@@ -453,8 +453,12 @@ private fun WatchlistPage(rows: List<Row>, broker: String, onPick: (Int) -> Unit
         Text("WATCHLIST", color = C.text, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
         Text("in sync with QT · tap an asset to open it", color = C.muted, fontSize = 9.sp)
         Spacer(Modifier.height(6.dp))
-        for ((i, r) in rows.withIndex()) {
-            WatchlistRow(r, broker) { onPick(i) }
+        // 🗂 _QT_WATCH_WATCHLIST_ORDER_MATCHES_QT_2026_10_23 — display in the SAME order as the QT watchlist ("closest to setup first", the
+        // desk lrc_order the server tags as `rank`); rows with no rank sort last. Tap still navigates by the ORIGINAL feed index, so the asset
+        // swipe pages stay put while only this list re-sorts — exactly like QT.
+        val ordered = rows.withIndex().sortedWith(compareBy({ it.value.rank ?: Int.MAX_VALUE }, { it.index }))
+        for (iv in ordered) {
+            WatchlistRow(iv.value, broker) { onPick(iv.index) }
             Spacer(Modifier.height(6.dp))
         }
         Spacer(Modifier.height(12.dp))
@@ -473,44 +477,59 @@ private fun WatchlistRow(r: Row, broker: String, onClick: () -> Unit) {
             Spacer(Modifier.weight(1f))
             Text(fmtPrice(px), color = C.text, fontFamily = MonoNum, fontSize = 12.sp)
         }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            r.ind?.let {
-                Text("●", color = rgbColor(it.col, it.hue), fontSize = 9.sp)
-                Text(" 1m ${lrcZone(it.hue, it.pos)}", color = C.muted, fontSize = 9.sp, fontFamily = MonoNum, maxLines = 1)
-            }
-            r.ind1h?.let {
-                Text("  |  ", color = C.muted, fontSize = 9.sp, fontFamily = MonoNum)
-                Text("●", color = rgbColor(it.col, it.hue), fontSize = 9.sp)
-                Text(" 1h ${lrcZone(it.hue, it.pos)}", color = C.muted, fontSize = 9.sp, fontFamily = MonoNum, maxLines = 1)
-            }
-        }
-        // 📏 _QT_WL_SHORT_AND_FAR_2026_10_23 — per asset: how many desk legs SHORT of a go AND ✈️ how far it already went PAST the rail in ATR,
-        // BOTH together in the | separation. When it has gone the call drops the "N short", so fall back to the legs not yet lit so it still shows.
-        run {
-            val shortN = r.call?.let { Regex("(\\d+)\\s*short").find(it)?.groupValues?.getOrNull(1) }
-                ?: run { val li = r.lit; val le = r.legs; if (li != null && le != null && le > li) (le - li).toString() else null }
-            val far = r.far
-            if (shortN != null || !far.isNullOrBlank()) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (shortN != null) Text("$shortN short", color = C.muted, fontSize = 9.sp, fontFamily = MonoNum)
-                    if (shortN != null && !far.isNullOrBlank()) Text("  |  ", color = C.muted, fontSize = 9.sp, fontFamily = MonoNum)
-                    if (!far.isNullOrBlank()) Text("✈️ $far", color = C.explosion, fontSize = 9.sp, fontFamily = MonoNum)
-                }
-            }
-        }
-        // 🌊 _QT_WL_WAE_2026_10_23 — the WAE read, same variants + wording as the QT watchlist chip: ✅ active · 🪶 lite · ⏸ pause · 🥊 against
-        // (contradict) · 🟠 fading. Its OWN line under the short / far row — a 3rd item on that row clips on the round face when both show.
-        r.wae?.let { w ->
-            val wc = when (w.mode?.lowercase()) {
-                "active", "firing", "fire" -> C.up
-                "against" -> C.down
-                "lite" -> C.accent
-                "fading", "dying", "spent" -> C.gold
-                else -> C.muted
-            }
-            Text("WAE · ${waeMode(w.mode, w.dying)}", color = wc, fontSize = 9.sp, fontFamily = MonoNum, maxLines = 1)
-        }
+        Spacer(Modifier.height(2.dp))
+        // 📊 _QT_WL_ALIGNED_GRID_2026_10_23 — Sam: "include its legs just like qt pc does it" + "organize and align all". One tidy two-column
+        // grid so every row lines up:  legs meter │ WAE  ·  1m LRC │ 1h LRC  ·  N short │ ✈️ far. Same data + wording as the QT watchlist.
+        val shortN = r.call?.let { Regex("(\\d+)\\s*short").find(it)?.groupValues?.getOrNull(1) }
+            ?: run { val li = r.lit; val le = r.legs; if (li != null && le != null && le > li) (le - li).toString() else null }
+        WlGrid(
+            left = { LegsInline(r.lit, r.legs) },
+            right = { r.wae?.let { WaeInline(it) } },
+        )
+        WlGrid(
+            left = { r.ind?.let { Text("●", color = rgbColor(it.col, it.hue), fontSize = 9.sp); Text(" 1m ${lrcZone(it.hue, it.pos)}", color = C.muted, fontSize = 9.sp, fontFamily = MonoNum, maxLines = 1) } },
+            right = { r.ind1h?.let { Text("●", color = rgbColor(it.col, it.hue), fontSize = 9.sp); Text(" 1h ${lrcZone(it.hue, it.pos)}", color = C.muted, fontSize = 9.sp, fontFamily = MonoNum, maxLines = 1) } },
+        )
+        if (shortN != null || !r.far.isNullOrBlank()) WlGrid(
+            left = { shortN?.let { Text("$it short", color = C.muted, fontSize = 9.sp, fontFamily = MonoNum) } },
+            right = { r.far?.takeIf { it.isNotBlank() }?.let { Text("✈️ $it", color = C.explosion, fontSize = 9.sp, fontFamily = MonoNum) } },
+        )
     }
+}
+
+// 📊 one aligned two-column line of the watchlist row — the left and right halves each take exactly half so the columns line up down the list.
+@Composable
+private fun WlGrid(left: @Composable () -> Unit, right: @Composable () -> Unit) {
+    Row(Modifier.fillMaxWidth().padding(top = 1.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) { left() }
+        Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) { right() }
+    }
+}
+
+// the desk-legs meter, exactly like QT's: one tick per leg, the lit ones filled (green when ALL lit, else accent) + the lit/legs count.
+@Composable
+private fun LegsInline(lit: Int?, legs: Int?) {
+    if (legs == null || legs <= 0) return
+    val l = (lit ?: 0).coerceIn(0, legs)
+    val onCol = if (l >= legs) C.up else C.accent
+    for (i in 0 until legs) {
+        Box(Modifier.padding(end = 1.dp).width(4.dp).height(6.dp).clip(RoundedCornerShape(1.dp)).background(if (i < l) onCol else C.border))
+    }
+    Spacer(Modifier.width(3.dp))
+    Text("$l/$legs", color = C.muted, fontSize = 9.sp, fontFamily = MonoNum, fontWeight = FontWeight.SemiBold)
+}
+
+// the WAE read, same variants + wording as the QT chip: ✅ active · 🪶 lite · ⏸ pause · 🥊 against · 🟠 fading, tinted by the mode.
+@Composable
+private fun WaeInline(w: Wae) {
+    val wc = when (w.mode?.lowercase()) {
+        "active", "firing", "fire" -> C.up
+        "against" -> C.down
+        "lite" -> C.accent
+        "fading", "dying", "spent" -> C.gold
+        else -> C.muted
+    }
+    Text(waeMode(w.mode, w.dying), color = wc, fontSize = 9.sp, fontFamily = MonoNum, maxLines = 1)
 }
 
 @Composable
