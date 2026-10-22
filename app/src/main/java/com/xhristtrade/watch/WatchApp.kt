@@ -156,11 +156,12 @@ private fun AssetCard(r: Row, idx: Int, total: Int) {
                 Column(Modifier.height(96.dp).weight(1f), verticalArrangement = Arrangement.SpaceBetween) {
                     Text("▔ ${fmtPrice(ind.upper)}", color = C.muted, fontFamily = MonoNum, fontSize = 9.sp)
                     Column {
-                        val pct = ind.bc?.let { (it.coerceIn(0.0, 1.0) * 100).toInt() }
                         Text(fmtPrice(ind.px ?: r.entry), color = indColor(ind), fontFamily = MonoNum,
                             fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                        Text(if (pct != null) "$pct% up channel" else "in channel", color = C.muted, fontSize = 9.sp)
-                        r.lrcLeg?.let { Text(it, color = indColor(ind), fontSize = 9.sp) }
+                        Spacer(Modifier.height(2.dp))
+                        // 1m & 1h LRC colour, aligned on = and bordered by | :  tf = zone | what it likely means
+                        LrcTfLine("1m", ind.hue, ind.pos)
+                        r.ind1h?.let { LrcTfLine("1h", it.hue, it.pos) }
                     }
                     Text("▁ ${fmtPrice(ind.lower)}", color = C.muted, fontFamily = MonoNum, fontSize = 9.sp)
                 }
@@ -200,6 +201,19 @@ private fun SectionLabel(s: String) {
     Text(s, color = C.muted, fontSize = 9.sp, fontWeight = FontWeight.SemiBold,
         modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Start)
     Spacer(Modifier.height(2.dp))
+}
+
+// One LRC timeframe line:  1m = 🟨 mid | coiling, no edge — wait   (aligned on =, bordered by |)
+@Composable
+private fun LrcTfLine(tf: String, hue: String?, pos: Double?) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(tf, color = C.muted, fontSize = 9.sp, fontFamily = MonoNum,
+            textAlign = TextAlign.End, modifier = Modifier.width(18.dp))
+        Text(" = ", color = C.muted, fontSize = 9.sp, fontFamily = MonoNum)
+        Text(lrcZone(hue, pos), color = hueColor(hue), fontSize = 9.sp, maxLines = 1)
+        Text(" | ", color = C.muted, fontSize = 9.sp, fontFamily = MonoNum)
+        Text(lrcMeaning(hue), color = C.muted, fontSize = 9.sp, maxLines = 1)
+    }
 }
 
 // Each row is  <label> = <value>  with the label in a fixed-width, right-aligned, monospace column,

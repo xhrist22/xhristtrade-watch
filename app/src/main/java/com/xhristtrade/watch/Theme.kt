@@ -20,6 +20,52 @@ object C {
     val aqua = Color(0xFF26C6DA)
     val explosion = Color(0xFFE5B80B) // WAE explosion line (yellow/gold)
     val deadzone = Color(0xFF42A5F5)  // WAE dead-zone line (blue)
+    // LRC channel zones — the EXACT palette QT's heat meter + desk use (aqua top → red bottom)
+    val lrcAqua = Color(0xFF00BCD4)
+    val lrcGreen = Color(0xFF7FD487)
+    val lrcYellow = Color(0xFFFFEB3B)
+    val lrcOrange = Color(0xFFF8A52B)
+    val lrcRed = Color(0xFFF01313)
+}
+
+// The desk's own words for where the candle sits in the channel (ranked.js SAY) — plain, no "% up channel".
+fun lrcWord(hue: String?, pos: Double?): String = when (hue?.lowercase()) {
+    "blue", "cyan", "aqua" -> if ((pos ?: 0.0) > 1) "🟦 broke up" else "🟦 top of channel"
+    "green" -> "🟩 upper half"
+    "yellow" -> "🟨 middle · coiling"
+    "orange" -> "🟧 lower half"
+    "red" -> if ((pos ?: 0.0) < -1) "🟥 broke down" else "🟥 bottom of channel"
+    else -> "— reading…"
+}
+
+// the LRC zone colour → a Compose Color (the heat palette)
+fun hueColor(hue: String?): Color = when (hue?.lowercase()) {
+    "blue", "cyan", "aqua" -> C.lrcAqua
+    "green" -> C.lrcGreen
+    "yellow" -> C.lrcYellow
+    "orange" -> C.lrcOrange
+    "red" -> C.lrcRed
+    else -> C.muted
+}
+
+// short zone word (for the compact 1m / 1h lines)
+fun lrcZone(hue: String?, pos: Double?): String = when (hue?.lowercase()) {
+    "blue", "cyan", "aqua" -> if ((pos ?: 0.0) > 1) "🟦 broke↑" else "🟦 top"
+    "green" -> "🟩 upper"
+    "yellow" -> "🟨 mid"
+    "orange" -> "🟧 lower"
+    "red" -> if ((pos ?: 0.0) < -1) "🟥 broke↓" else "🟥 bot"
+    else -> "—"
+}
+
+// what that colour most likely means for the next move
+fun lrcMeaning(hue: String?): String = when (hue?.lowercase()) {
+    "blue", "cyan", "aqua" -> "stretched↑, may fade"
+    "green" -> "strength, leaning ↑"
+    "yellow" -> "coiling, no edge — wait"
+    "orange" -> "weak, leaning ↓"
+    "red" -> "stretched↓, may bounce"
+    else -> "reading…"
 }
 
 // Numbers are monospace to match the terminal (ui-monospace in app.css).

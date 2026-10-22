@@ -11,9 +11,13 @@ data class Ind(
     val lower: Double?,
     val ema9: Double?,
     val bc: Double?,        // price's fraction in the channel: 0 = lower rail, 1 = upper rail
+    val pos: Double?,       // signed half-widths from the middle (±1 = the rails, >1 broke up, <-1 broke down)
     val col: IntArray?,     // [r,g,b] parsed from "rgb(r,g,b)"
     val hue: String?,       // "aqua" / "yellow" / "red" — the candle temperature word
 )
+
+// the 1h LRC candle colour (compact — just what the 1m/1h lines need)
+data class Lrc1h(val hue: String?, val pos: Double?, val col: IntArray?)
 
 data class Kuru(
     val series: List<DoubleArray>, // each: [k1 (Lead), k2 (2x), k4 (4x)]
@@ -66,6 +70,7 @@ data class Row(
     val signalWhy: String?,
     val lrcLeg: String?,
     val ind: Ind?,
+    val ind1h: Lrc1h?,
     val entry: Double?,
     val stop: Stop?,
     val backup: Stop?,
@@ -136,8 +141,12 @@ fun parseFeed(body: String): Feed {
         val indO = o.objn("ind")
         val ind = if (indO == null) null else Ind(
             px = indO.dbl("px"), upper = indO.dbl("upper"), lower = indO.dbl("lower"),
-            ema9 = indO.dbl("ema9"), bc = indO.dbl("bc"),
+            ema9 = indO.dbl("ema9"), bc = indO.dbl("bc"), pos = indO.dbl("pos"),
             col = parseRgb(indO.strn("col")), hue = indO.strn("hue"),
+        )
+        val i1hO = o.objn("ind_1h")
+        val ind1h = if (i1hO == null) null else Lrc1h(
+            hue = i1hO.strn("hue"), pos = i1hO.dbl("pos"), col = parseRgb(i1hO.strn("col")),
         )
 
         val kO = o.objn("kuru")
@@ -185,6 +194,7 @@ fun parseFeed(body: String): Feed {
                 signalWhy = o.strn("signal_why"),
                 lrcLeg = o.strn("lrc_leg"),
                 ind = ind,
+                ind1h = ind1h,
                 entry = o.dbl("entry"),
                 stop = stopOf(o.objn("stop")),
                 backup = stopOf(o.objn("backup")),

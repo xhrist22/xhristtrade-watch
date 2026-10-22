@@ -2,6 +2,7 @@ package com.xhristtrade.watch
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
@@ -19,12 +20,7 @@ private fun clamp01(v: Double): Float = v.coerceIn(0.0, 1.0).toFloat()
 fun indColor(ind: Ind?): Color {
     val c = ind?.col
     if (c != null && c.size == 3) return Color(c[0].coerceIn(0, 255), c[1].coerceIn(0, 255), c[2].coerceIn(0, 255))
-    return when (ind?.hue) {
-        "aqua", "cyan" -> C.aqua
-        "red" -> C.down
-        "yellow" -> C.yellow
-        else -> C.muted
-    }
+    return hueColor(ind?.hue)
 }
 
 // ── 30-min sparkline ──
@@ -135,15 +131,15 @@ fun WaeChart(w: Wae, modifier: Modifier) {
     }
 }
 
-// ── LRC channel: a vertical gauge, price ball + EMA9 tick, tinted by candle temperature ──
+// ── LRC channel — a glass tube in the LRC colours (aqua top → red bottom), like QT's heat meter.
+//    The bright marker is PRICE's place in the channel; the orange tick is EMA9; the dashed line is fair value (mid). ──
 @Composable
 fun LrcBar(ind: Ind, modifier: Modifier) {
     Canvas(modifier) {
         val w = size.width
         val h = size.height
-        val railW = w * 0.56f
-        val x0 = (w - railW) / 2f
-        // fraction of price in channel
+        val tubeW = w * 0.64f
+        val x0 = (w - tubeW) / 2f
         val f: Float = when {
             ind.bc != null -> clamp01(ind.bc)
             ind.px != null && ind.upper != null && ind.lower != null && ind.upper != ind.lower ->
@@ -153,28 +149,34 @@ fun LrcBar(ind: Ind, modifier: Modifier) {
         val eF: Float? = if (ind.ema9 != null && ind.upper != null && ind.lower != null && ind.upper != ind.lower)
             clamp01((ind.ema9 - ind.lower) / (ind.upper - ind.lower)) else null
         fun y(frac: Float) = h - frac * h
-        val col = indColor(ind)
+        val rad = tubeW / 2f
+        val cr = androidx.compose.ui.geometry.CornerRadius(rad)
 
-        // rail background
-        drawRoundRect(C.panel2, topLeft = Offset(x0, 0f),
-            size = androidx.compose.ui.geometry.Size(railW, h),
-            cornerRadius = androidx.compose.ui.geometry.CornerRadius(railW / 2f))
-        // fill from bottom up to the price (leading-side tint)
-        drawRoundRect(col.copy(alpha = 0.42f), topLeft = Offset(x0, y(f)),
-            size = androidx.compose.ui.geometry.Size(railW, h - y(f)),
-            cornerRadius = androidx.compose.ui.geometry.CornerRadius(railW / 2f))
-        // midline (fair value)
-        drawLine(C.muted.copy(alpha = 0.55f), Offset(x0 - 3f, y(0.5f)), Offset(x0 + railW + 3f, y(0.5f)),
+        // the channel itself: ONE gradient in the LRC zone colours (top strong → bottom weak)
+        val brush = Brush.verticalGradient(
+            0f to C.lrcAqua, 0.25f to C.lrcGreen, 0.5f to C.lrcYellow, 0.75f to C.lrcOrange, 1f to C.lrcRed,
+        )
+        drawRoundRect(brush = brush, topLeft = Offset(x0, 0f),
+            size = androidx.compose.ui.geometry.Size(tubeW, h), cornerRadius = cr, alpha = 0.52f)
+        // glass sheen down the left of the tube
+        drawRoundRect(C.text.copy(alpha = 0.08f), topLeft = Offset(x0 + tubeW * 0.12f, h * 0.04f),
+            size = androidx.compose.ui.geometry.Size(tubeW * 0.24f, h * 0.92f),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(tubeW * 0.12f))
+        // tube outline
+        drawRoundRect(C.border, topLeft = Offset(x0, 0f),
+            size = androidx.compose.ui.geometry.Size(tubeW, h), cornerRadius = cr, style = Stroke(width = 1.2f))
+        // fair-value midline (dashed)
+        drawLine(C.bg.copy(alpha = 0.5f), Offset(x0, y(0.5f)), Offset(x0 + tubeW, y(0.5f)),
             strokeWidth = 1f, pathEffect = PathEffect.dashPathEffect(floatArrayOf(4f, 4f)))
-        // EMA9 tick (accent) — extends past the rail so it's legible
+        // EMA9 tick (orange, like the chart's EMA9)
         eF?.let {
-            drawLine(C.accent, Offset(x0 - 5f, y(it)), Offset(x0 + railW + 5f, y(it)), strokeWidth = 2.5f, cap = StrokeCap.Round)
+            drawLine(C.explosion, Offset(x0 - 5f, y(it)), Offset(x0 + tubeW + 5f, y(it)), strokeWidth = 2.5f, cap = StrokeCap.Round)
         }
-        // price ball — halo + colored ball + inner hole so it reads on any fill
-        val cx = w / 2f; val cy = y(f)
-        drawCircle(C.bg, radius = railW * 0.62f, center = Offset(cx, cy))
-        drawCircle(col, radius = railW * 0.52f, center = Offset(cx, cy))
-        drawCircle(C.bg, radius = railW * 0.22f, center = Offset(cx, cy))
+        // PRICE marker — a bright level line + a puck in the current zone colour, legible on any band
+        val cy = y(f); val cx = w / 2f
+        drawLine(C.text, Offset(x0 - 4f, cy), Offset(x0 + tubeW + 4f, cy), strokeWidth = 2f, cap = StrokeCap.Round)
+        drawCircle(C.bg, radius = tubeW * 0.44f, center = Offset(cx, cy))
+        drawCircle(indColor(ind), radius = tubeW * 0.36f, center = Offset(cx, cy))
     }
 }
 
