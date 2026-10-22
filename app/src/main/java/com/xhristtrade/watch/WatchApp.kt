@@ -5,7 +5,6 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -17,7 +16,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -32,7 +30,6 @@ import androidx.wear.compose.material.TimeText
 import androidx.wear.remote.interactions.RemoteActivityHelper
 import com.google.android.gms.wearable.Wearable
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 @Composable
@@ -60,23 +57,40 @@ fun WatchApp() {
 
     var broker by remember { mutableStateOf("Chart") }   // default: the engine / chart price
 
+    // ⌚🔐 _QT_WATCH_ORDERS_SIGNED_2026_10_22 — the trade side: a signed read every 4 s (trades + the exact account roster); not yet
+    // approved ⇒ the Trades page shows the pairing code. `poke` re-reads at once after a press.
+    var wo by remember { mutableStateOf(WoUi(null, null, null)) }
+    var poke by remember { mutableStateOf(0) }
+    LaunchedEffect(poke) {
+        while (true) {
+            wo = when (val r = Orders.signed("trades")) {
+                is WoResult.Ok -> WoUi(true, parseTrades(r.json), null)
+                is WoResult.Unpaired -> WoUi(false, null, null)
+                is WoResult.Err -> wo.copy(error = r.why)
+            }
+            delay(if (wo.paired == true) 4_000 else 6_000)
+        }
+    }
+    val onChanged = { poke++ }
+
     Scaffold(timeText = { TimeText() }) {
         Box(Modifier.fillMaxSize().background(C.bg)) {
             if (rows.isEmpty()) {
                 SplashOrError(error)
             } else {
-                // page 0 = BROKER PICKER · 1..N = assets re-priced to the pick · last = hub. Loops both ways, starts on the picker.
+                // page 0 = BROKER PICKER · 1 = TRADES · 2..N+1 = assets re-priced to the pick · last = hub. Loops both ways, starts on the picker.
                 val brokers = rows.firstOrNull()?.brokers ?: emptyList()
-                val real = rows.size + 2
+                val real = rows.size + 3
                 val pager = rememberPagerState(initialPage = real * 1000, pageCount = { real * 2000 })
                 HorizontalPager(state = pager, modifier = Modifier.fillMaxSize()) { page ->
                     val idx = ((page % real) + real) % real
                     when {
                         idx == 0 -> BrokerPicker(brokers, broker) { broker = it }
-                        idx <= rows.size -> {
-                            val r = rows[idx - 1]
+                        idx == 1 -> TradesPage(wo, onChanged)
+                        idx <= rows.size + 1 -> {
+                            val r = rows[idx - 2]
                             val basis = if (broker == "Chart") 0.0 else (r.brokers.firstOrNull { it.name == broker }?.basis ?: 0.0)
-                            AssetCard(r, idx - 1, rows.size, broker, basis)
+                            AssetCard(r, idx - 2, rows.size, broker, basis, wo, onChanged)
                         }
                         else -> HubPage(rows.size, updatedAt, error)
                     }
@@ -104,7 +118,7 @@ private fun SplashOrError(error: String?) {
 }
 
 @Composable
-private fun AssetCard(r: Row, idx: Int, total: Int, brokerName: String, basis: Double) {
+private fun AssetCard(r: Row, idx: Int, total: Int, brokerName: String, basis: Double, wo: WoUi, onChanged: () -> Unit) {
     fun sp(v: Double?): Double? = v?.let { it + basis }   // shift a chart price into the selected broker's price
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState())
@@ -215,51 +229,24 @@ private fun AssetCard(r: Row, idx: Int, total: Int, brokerName: String, basis: D
             Text(it, color = C.muted, fontSize = 10.sp, textAlign = TextAlign.Center)
         }
 
-        // 📱 hold 5s → open THIS asset on the phone's QT
+        // 📱 hold 3s → open THIS asset on the phone's QT
         Spacer(Modifier.height(10.dp))
         HoldToPhoneButton(r.symbol, r.asset)
+        // 🖲 hold 5s → this asset's desk side on the picked broker (signed by the watch's own key) — the very bottom of the card
+        Spacer(Modifier.height(8.dp))
+        OrderHoldButton(r, brokerName, wo, onChanged)
         Spacer(Modifier.height(18.dp))
     }
 }
 
-// Press-and-HOLD ~5s (a bar fills); on completion RemoteActivityHelper opens this exact asset in QT on the phone
-// via QT's own deep-link ( ?view=<symbol>&tf=1m ) — non-destructive, lands straight on the asset.
+// Press-and-HOLD 3 s (the shared HoldBar); on completion the OPEN phone QT switches to this asset in place — no browser, no reload.
 @Composable
 private fun HoldToPhoneButton(symbol: String?, assetName: String) {
     if (symbol == null) return
     val ctx = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var prog by remember { mutableStateOf(0f) }
-    Box(
-        Modifier.fillMaxWidth().height(36.dp).clip(RoundedCornerShape(18.dp)).background(C.panel)
-            .pointerInput(symbol) {
-                detectTapGestures(onPress = {
-                    val start = System.currentTimeMillis()
-                    val job = scope.launch {
-                        while (true) {
-                            prog = ((System.currentTimeMillis() - start) / 3000f).coerceAtMost(1f)
-                            if (prog >= 1f) {
-                                // steer the OPEN phone QT to this asset, in place — no browser, no reload
-                                val ok = Net.postFocus(symbol)
-                                Toast.makeText(ctx, if (ok) "$assetName → your phone chart" else "Couldn't reach the server", Toast.LENGTH_SHORT).show()
-                                break
-                            }
-                            delay(30)
-                        }
-                    }
-                    tryAwaitRelease()
-                    job.cancel(); prog = 0f
-                })
-            },
-        contentAlignment = Alignment.Center,
-    ) {
-        if (prog > 0f) {
-            Box(Modifier.fillMaxWidth(prog).fillMaxHeight().clip(RoundedCornerShape(18.dp)).background(C.accent.copy(alpha = 0.55f)))
-        }
-        Text(
-            if (prog > 0f) "keep holding… ${(3 - prog * 3).toInt().coerceAtLeast(0)}s" else "📱 hold 3s → $assetName on phone chart",
-            color = C.text, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
-        )
+    HoldBar(3, "📱 hold 3s → $assetName on phone chart", C.accent) {
+        val ok = Net.postFocus(symbol)
+        Toast.makeText(ctx, if (ok) "$assetName → your phone chart" else "Couldn't reach the server", Toast.LENGTH_SHORT).show()
     }
 }
 

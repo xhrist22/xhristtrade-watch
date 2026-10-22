@@ -89,23 +89,23 @@ data class Feed(val rows: List<Row>)
 
 // ── parsing helpers (org.json; JSON null → Kotlin null, NaN → null) ──
 
-private fun JSONObject.dbl(k: String): Double? {
+internal fun JSONObject.dbl(k: String): Double? {
     if (!has(k) || isNull(k)) return null
     val v = optDouble(k, Double.NaN)
     return if (v.isNaN()) null else v
 }
-private fun JSONObject.boolf(k: String): Boolean = optBoolean(k, false)
-private fun JSONObject.intn(k: String): Int? {
+internal fun JSONObject.boolf(k: String): Boolean = optBoolean(k, false)
+internal fun JSONObject.intn(k: String): Int? {
     if (!has(k) || isNull(k)) return null
     return optInt(k, Int.MIN_VALUE).let { if (it == Int.MIN_VALUE) null else it }
 }
-private fun JSONObject.strn(k: String): String? {
+internal fun JSONObject.strn(k: String): String? {
     if (!has(k) || isNull(k)) return null
     val s = optString(k, "")
     return if (s.isEmpty()) null else s
 }
-private fun JSONObject.objn(k: String): JSONObject? = if (!has(k) || isNull(k)) null else optJSONObject(k)
-private fun JSONObject.arrn(k: String): JSONArray? = if (!has(k) || isNull(k)) null else optJSONArray(k)
+internal fun JSONObject.objn(k: String): JSONObject? = if (!has(k) || isNull(k)) null else optJSONObject(k)
+internal fun JSONObject.arrn(k: String): JSONArray? = if (!has(k) || isNull(k)) null else optJSONArray(k)
 
 private fun parseRgb(s: String?): IntArray? {
     if (s == null) return null

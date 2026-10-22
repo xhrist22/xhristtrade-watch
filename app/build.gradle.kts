@@ -25,8 +25,8 @@ android {
         applicationId = "com.xhristtrade.watch"
         minSdk = 30            // Wear OS 3 (Galaxy Watch 4 and up)
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1"
 
         buildConfigField("String", "BASE_URL", "\"${cfg("BASE_URL", "https://xhristtrade.com")}\"")
         buildConfigField("String", "WATCH_KEY", "\"${cfg("WATCH_KEY", "")}\"")

@@ -12,7 +12,15 @@ A glance-and-swipe read of your desk on your wrist. One card per asset
 
 Swipe left/right between assets; the last page is a hub with **Open QT on phone**.
 
-**Data-only. No AI, no voice, no account data.** It reads exactly one endpoint:
+**Trades from the wrist — locked to this one watch.** Page 2 (📒 Trades) shows every open trade live (price, $ and R up/down, SL,
+TP, the trail) with **hold 3s → close**; each asset card ends with **hold 5s → BUY/SELL** the desk's side on the broker picked on page 1.
+Those calls are signed by a key the watch makes **inside its secure chip** (Android Keystore, never readable — not even from this APK),
+and the server honours it only after you approve that key on your phone's QT (a ⌚ card shows a pairing code; approve only if the watch
+shows the same code). Forged, replayed, stale or unapproved requests are refused; the ⌚ chip in QT revokes the watch at once; the file
+`/root/qt/watch_orders_off` on the server stops every watch order. Orders go through QT's own order path: the account named by its exact
+id AND name, placed by that account's bot in that broker's prices, and Telegram says "⌚ Watch" on every result.
+
+**No AI, no voice.** The desk read uses one endpoint:
 `GET <BASE_URL>/api/qe/watch?k=<WATCH_KEY>` over HTTPS. That code gets the **viewer**
 role, so the server scrubs all accounts and 403s every AI/owner endpoint — the watch
 can only ever see this read-only feed. The owner code is never on the watch.
