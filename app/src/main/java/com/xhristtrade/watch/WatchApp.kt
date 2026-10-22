@@ -418,6 +418,18 @@ private fun WatchlistRow(r: Row, broker: String) {
                 Text(" 1h ${lrcZone(it.hue, it.pos)}", color = C.muted, fontSize = 9.sp, fontFamily = MonoNum, maxLines = 1)
             }
         }
+        // 📏 _QT_WL_SHORT_AND_FAR_2026_10_23 — per asset: how many desk legs SHORT of a go, and ✈️ if it already went, how far PAST the rail in ATR
+        run {
+            val shortN = r.call?.let { Regex("(\\d+)\\s*short").find(it)?.groupValues?.getOrNull(1) }
+            val far = r.far
+            if (shortN != null || !far.isNullOrBlank()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (shortN != null) Text("$shortN short", color = C.muted, fontSize = 9.sp, fontFamily = MonoNum)
+                    if (shortN != null && !far.isNullOrBlank()) Text("  ·  ", color = C.muted, fontSize = 9.sp, fontFamily = MonoNum)
+                    if (!far.isNullOrBlank()) Text("✈️ $far", color = C.explosion, fontSize = 9.sp, fontFamily = MonoNum)
+                }
+            }
+        }
     }
 }
 
