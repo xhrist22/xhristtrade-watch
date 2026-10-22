@@ -234,7 +234,12 @@ private fun AssetCard(r: Row, idx: Int, total: Int, brokerName: String, basis: D
             if (tp.buy != null && tp.sell != null) PlanRow("tape", "buyers ${tp.buy}% · sellers ${tp.sell}%", C.text)
             tp.means?.let { PlanRow("means", it, C.muted) }
         }
-        r.backup?.let { b -> PlanRow("2nd SL", "🟧 ${fmtPrice(sp(b.price))}", C.gold) }
+        r.backup?.let { b ->
+            // 📏 _QT_ORANGE_SL_ATR_2026_10_22 — the 🟧 2nd SL shows its ×ATR distance too, exactly like the 🟩 green SL (the main orange SL
+            // already does via the SL row). So every stop on the watch — green or orange, main or backup — reads its distance in ATR.
+            val atr = b.atrAway?.let { " ·${it.fmt1()}×ATR" } ?: ""
+            PlanRow("2nd SL", "🟧 ${fmtPrice(sp(b.price))}$atr", C.gold)
+        }
 
         // ── why it isn't a trade yet ──
         r.reason?.let {
