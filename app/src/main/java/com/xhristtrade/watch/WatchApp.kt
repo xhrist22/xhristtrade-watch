@@ -37,17 +37,19 @@ fun WatchApp() {
     var updatedAt by remember { mutableStateOf(0L) }
     var everLoaded by remember { mutableStateOf(false) }
 
-    // poll every 12s, forever (foreground watch app)
+    // poll fast, forever; ride through a brief upstream blip (502/restart) showing the LAST data, retry quickly
     LaunchedEffect(Unit) {
         while (true) {
+            var ok = true
             when (val r = Net.fetchWatch()) {
                 is FetchResult.Ok -> {
                     if (r.feed.rows.isNotEmpty()) rows = r.feed.rows
                     error = null; updatedAt = System.currentTimeMillis(); everLoaded = true
                 }
-                is FetchResult.Err -> { error = r.message; if (!everLoaded) rows = emptyList() }
+                is FetchResult.Err -> { ok = false; error = r.message; if (!everLoaded) rows = emptyList() }
             }
-            delay(12_000)
+            // 6s when healthy (server cache is ~instant); 2.5s retry after a blip so it snaps back fast
+            delay(if (ok) 6_000 else 2_500)
         }
     }
 
@@ -56,10 +58,13 @@ fun WatchApp() {
             if (rows.isEmpty()) {
                 SplashOrError(error)
             } else {
-                val pageCount = rows.size + 1
-                val pager = rememberPagerState(pageCount = { pageCount })
+                // ♾ looping deck — swiping past the last page wraps smartly back to the first (both directions).
+                // A big virtual page count started in the middle gives seamless wrap with no snap.
+                val real = rows.size + 1                 // assets + the hub page
+                val pager = rememberPagerState(initialPage = real * 1000, pageCount = { real * 2000 })
                 HorizontalPager(state = pager, modifier = Modifier.fillMaxSize()) { page ->
-                    if (page < rows.size) AssetCard(rows[page], page, rows.size)
+                    val idx = ((page % real) + real) % real
+                    if (idx < rows.size) AssetCard(rows[idx], idx, rows.size)
                     else HubPage(rows.size, updatedAt, error)
                 }
             }
@@ -103,11 +108,15 @@ private fun AssetCard(r: Row, idx: Int, total: Int) {
         // dots = which page
         Text(dots(idx, total), color = C.muted, fontSize = 9.sp)
 
-        // call / verdict
+        // call / verdict — keeps the "N short" count; a ⬜ marks short-by-just-1 (one check from gold)
         r.call?.let {
             Spacer(Modifier.height(2.dp))
-            Text(it, color = callColor(r.signal), fontSize = 11.sp, textAlign = TextAlign.Center,
+            Text(prettyCall(it), color = callColor(r.signal), fontSize = 11.sp, textAlign = TextAlign.Center,
                 fontWeight = FontWeight.SemiBold)
+        }
+        // ✈️ how far it ALREADY WENT, in ATR (straight from the feed's own `far`, e.g. "↑0.33× ATR")
+        r.far?.let {
+            Text("✈️ went $it", color = C.muted, fontSize = 10.sp, textAlign = TextAlign.Center)
         }
 
         // legs meter
@@ -138,38 +147,44 @@ private fun AssetCard(r: Row, idx: Int, total: Int) {
             Spacer(Modifier.height(8.dp))
         }
 
-        // ── LRC channel + its leg ──
+        // ── LRC channel — bar + text aligned to the rails (top = upper rail, bottom = lower rail) ──
         r.ind?.let { ind ->
             SectionLabel("LRC")
             Row(verticalAlignment = Alignment.CenterVertically) {
-                LrcBar(ind, Modifier.width(26.dp).height(84.dp))
-                Spacer(Modifier.width(10.dp))
-                Column {
-                    ind.upper?.let { Text("▔ ${fmtPrice(it)}", color = C.muted, fontFamily = MonoNum, fontSize = 9.sp) }
-                    r.lrcLeg?.let { Text(it, color = indColor(ind), fontSize = 10.sp) }
-                    ind.lower?.let { Text("▁ ${fmtPrice(it)}", color = C.muted, fontFamily = MonoNum, fontSize = 9.sp) }
+                LrcBar(ind, Modifier.width(22.dp).height(96.dp))
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.height(96.dp).weight(1f), verticalArrangement = Arrangement.SpaceBetween) {
+                    Text("▔ ${fmtPrice(ind.upper)}", color = C.muted, fontFamily = MonoNum, fontSize = 9.sp)
+                    Column {
+                        val pct = ind.bc?.let { (it.coerceIn(0.0, 1.0) * 100).toInt() }
+                        Text(fmtPrice(ind.px ?: r.entry), color = indColor(ind), fontFamily = MonoNum,
+                            fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                        Text(if (pct != null) "$pct% up channel" else "in channel", color = C.muted, fontSize = 9.sp)
+                        r.lrcLeg?.let { Text(it, color = indColor(ind), fontSize = 9.sp) }
+                    }
+                    Text("▁ ${fmtPrice(ind.lower)}", color = C.muted, fontFamily = MonoNum, fontSize = 9.sp)
                 }
             }
             Spacer(Modifier.height(8.dp))
         }
 
-        // ── plan: SL / TP3 / RR ──
+        // ── plan: every row aligned on = like the ChartWire desk ──
         SectionLabel("PLAN")
+        PlanRow("side", "${sideArrow(r.side)} ${r.side ?: "—"}", sideColor(r.side))
+        r.entry?.let { PlanRow("now", fmtPrice(it), C.text) }
         r.stop?.let { s ->
             val tag = if (s.green) (if (s.pays) "🟩 pays" else "🟩") else "🟧"
-            val atr = s.atrAway?.let { " · ${(it).fmt1()}×ATR" } ?: ""
-            PlanRow("$tag SL", "${fmtPrice(s.price)}$atr", if (s.green) C.up else C.gold)
-            s.rr?.let { PlanRow("⚖️ RR", "%.2f".format(it), rrColor(it)) }
+            val atr = s.atrAway?.let { " ·${it.fmt1()}×ATR" } ?: ""
+            PlanRow("SL", "$tag ${fmtPrice(s.price)}$atr", if (s.green) C.up else C.gold)
+            s.rr?.let { PlanRow("RR", "%.2f".format(it), rrColor(it)) }
         }
         r.target?.let { t ->
-            val reach = t.reachPct?.let { " · ${it}%" } ?: ""
-            val src = t.from?.let { " · $it" } ?: ""
-            PlanRow("📈 TP3", "${fmtPrice(t.price)}$reach$src", C.text)
-            if (r.stop?.rr == null) t.rr?.let { PlanRow("⚖️ RR", "%.2f".format(it), rrColor(it)) }
+            val reach = t.reachPct?.let { " ·${it}%" } ?: ""
+            val src = t.from?.let { " ·$it" } ?: ""
+            PlanRow("TP3", "📈 ${fmtPrice(t.price)}$reach$src", C.text)
+            if (r.stop?.rr == null) t.rr?.let { PlanRow("RR", "%.2f".format(it), rrColor(it)) }
         }
-        r.backup?.let { b ->
-            PlanRow("🟧 2nd SL", fmtPrice(b.price), C.gold)
-        }
+        r.backup?.let { b -> PlanRow("2nd SL", "🟧 ${fmtPrice(b.price)}", C.gold) }
 
         // ── why it isn't a trade yet ──
         r.reason?.let {
@@ -187,15 +202,18 @@ private fun SectionLabel(s: String) {
     Spacer(Modifier.height(2.dp))
 }
 
+// Each row is  <label> = <value>  with the label in a fixed-width, right-aligned, monospace column,
+// so every "=" lines up vertically down the plan — the ChartWire desk look.
 @Composable
 private fun PlanRow(label: String, value: String, valueColor: Color) {
     Row(
         Modifier.fillMaxWidth().padding(vertical = 1.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, color = C.text, fontSize = 11.sp)
-        Text(value, color = valueColor, fontFamily = MonoNum, fontSize = 11.sp, textAlign = TextAlign.End)
+        Text(label, color = C.muted, fontSize = 11.sp, fontFamily = MonoNum,
+            textAlign = TextAlign.End, maxLines = 1, modifier = Modifier.width(46.dp))
+        Text(" = ", color = C.muted, fontSize = 11.sp, fontFamily = MonoNum)
+        Text(value, color = valueColor, fontSize = 11.sp, fontFamily = MonoNum, maxLines = 1)
     }
 }
 
@@ -241,6 +259,11 @@ private fun openOnPhone(ctx: android.content.Context) {
 }
 
 // ── small helpers ──
+// Keep the "N short" count; when it's short by just 1, prepend ⬜ (one check short of 🟨 gold — Sam's own convention).
+private fun prettyCall(call: String): String {
+    val m = Regex("""\b1 short\b""").containsMatchIn(call)
+    return if (m) call.replace(Regex("""\b1 short\b"""), "⬜ 1 short") else call
+}
 private fun sideArrow(side: String?): String = when (side?.uppercase()) {
     "BUY" -> "▲"; "SELL" -> "▼"; else -> "⇅"
 }

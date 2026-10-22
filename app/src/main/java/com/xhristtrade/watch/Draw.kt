@@ -141,7 +141,7 @@ fun LrcBar(ind: Ind, modifier: Modifier) {
     Canvas(modifier) {
         val w = size.width
         val h = size.height
-        val railW = w * 0.46f
+        val railW = w * 0.56f
         val x0 = (w - railW) / 2f
         // fraction of price in channel
         val f: Float = when {
@@ -159,20 +159,22 @@ fun LrcBar(ind: Ind, modifier: Modifier) {
         drawRoundRect(C.panel2, topLeft = Offset(x0, 0f),
             size = androidx.compose.ui.geometry.Size(railW, h),
             cornerRadius = androidx.compose.ui.geometry.CornerRadius(railW / 2f))
-        // fill from bottom up to f
-        drawRoundRect(col.copy(alpha = 0.33f), topLeft = Offset(x0, y(f)),
+        // fill from bottom up to the price (leading-side tint)
+        drawRoundRect(col.copy(alpha = 0.42f), topLeft = Offset(x0, y(f)),
             size = androidx.compose.ui.geometry.Size(railW, h - y(f)),
             cornerRadius = androidx.compose.ui.geometry.CornerRadius(railW / 2f))
-        // midline
-        drawLine(C.muted.copy(alpha = 0.5f), Offset(x0 - 3f, y(0.5f)), Offset(x0 + railW + 3f, y(0.5f)),
+        // midline (fair value)
+        drawLine(C.muted.copy(alpha = 0.55f), Offset(x0 - 3f, y(0.5f)), Offset(x0 + railW + 3f, y(0.5f)),
             strokeWidth = 1f, pathEffect = PathEffect.dashPathEffect(floatArrayOf(4f, 4f)))
-        // EMA9 tick (accent)
+        // EMA9 tick (accent) — extends past the rail so it's legible
         eF?.let {
-            drawLine(C.accent, Offset(x0 - 4f, y(it)), Offset(x0 + railW + 4f, y(it)), strokeWidth = 2f, cap = StrokeCap.Round)
+            drawLine(C.accent, Offset(x0 - 5f, y(it)), Offset(x0 + railW + 5f, y(it)), strokeWidth = 2.5f, cap = StrokeCap.Round)
         }
-        // price ball
-        drawCircle(col, radius = railW * 0.42f, center = Offset(w / 2f, y(f)))
-        drawCircle(C.bg, radius = railW * 0.20f, center = Offset(w / 2f, y(f)))
+        // price ball — halo + colored ball + inner hole so it reads on any fill
+        val cx = w / 2f; val cy = y(f)
+        drawCircle(C.bg, radius = railW * 0.62f, center = Offset(cx, cy))
+        drawCircle(col, radius = railW * 0.52f, center = Offset(cx, cy))
+        drawCircle(C.bg, radius = railW * 0.22f, center = Offset(cx, cy))
     }
 }
 
