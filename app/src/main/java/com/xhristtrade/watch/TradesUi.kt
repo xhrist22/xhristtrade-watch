@@ -1,6 +1,7 @@
 package com.xhristtrade.watch
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -83,11 +84,26 @@ fun TradesPage(wo: WoUi, onChanged: () -> Unit) {
                 val f = wo.feed
                 if (f?.off == true) Text("⛔ watch orders are OFF on the server", color = C.gold, fontSize = 9.sp, textAlign = TextAlign.Center)
                 wo.error?.let { Text(it, color = C.down, fontSize = 9.sp, textAlign = TextAlign.Center) }
-                if (f == null || f.accounts.isEmpty()) {
-                    Spacer(Modifier.height(10.dp))
-                    Text("no open trades", color = C.muted, fontSize = 11.sp)
+                // 🖲✖ in-flight actions across every account, up top (transient)
+                f?.accounts?.forEach { a ->
+                    a.order?.let { o -> Text("🖲 ${o.side ?: ""} ${o.asset ?: ""} · ${o.status ?: ""}${o.why?.let { " · $it" } ?: ""}",
+                        color = statusColor(o.status), fontSize = 9.sp, textAlign = TextAlign.Center, maxLines = 3) }
+                    a.closing?.let { c -> Text("✖ ${c.asset ?: ""} · ${c.status ?: ""}${c.why?.let { " · $it" } ?: ""}",
+                        color = statusColor(c.status), fontSize = 9.sp, textAlign = TextAlign.Center, maxLines = 3) }
                 }
-                f?.accounts?.forEach { a -> AccountBlock(a, onChanged) }
+                // 📒 _QT_WATCH_TRADES_BY_ASSET_2026_10_23 — every open trade grouped by ASSET and AUTO-COLLAPSED: one tappable header per asset
+                // (its side · how many accounts hold it · the net P&L); tap to expand to the per-account cards, each with its own ✖ close.
+                val groups = f?.accounts.orEmpty().flatMap { a -> a.trades.map { a to it } }.groupBy { it.second.asset }
+                if (groups.isEmpty()) {
+                    Spacer(Modifier.height(10.dp)); Text("no open trades", color = C.muted, fontSize = 11.sp)
+                } else {
+                    val flat = groups.values.flatten()
+                    val net = flat.sumOf { it.second.pnl ?: 0.0 }; val n = flat.size
+                    Spacer(Modifier.height(4.dp))
+                    Text("open ${signedMoney(net)} · $n ${if (n == 1) "trade" else "trades"} · ${groups.size} ${if (groups.size == 1) "asset" else "assets"}",
+                        color = pnlColor(net), fontFamily = MonoNum, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                    groups.forEach { (asset, list) -> AssetGroup(asset, list, onChanged) }
+                }
             }
         }
         Spacer(Modifier.height(24.dp))
@@ -116,47 +132,58 @@ private fun PairPanel(onChanged: () -> Unit) {
     note?.let { Text(it, color = C.muted, fontSize = 9.sp, textAlign = TextAlign.Center) }
 }
 
+// 📒 _QT_WATCH_TRADES_BY_ASSET_2026_10_23 — one collapsed header per asset (side · ×accounts · net P&L); tap to open the per-account cards.
 @Composable
-private fun AccountBlock(a: Account, onChanged: () -> Unit) {
-    Spacer(Modifier.height(8.dp))
+private fun AssetGroup(asset: String, trades: List<Pair<Account, Trade>>, onChanged: () -> Unit) {
+    var open by remember(asset) { mutableStateOf(false) }   // auto-collapsed
+    val net = trades.sumOf { it.second.pnl ?: 0.0 }
+    val dir = trades.firstOrNull()?.second?.dir
+    Spacer(Modifier.height(6.dp))
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(C.panel)
+            .clickable { open = !open }.padding(horizontal = 8.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(if (open) "▾" else "▸", color = C.muted, fontSize = 11.sp, modifier = Modifier.width(13.dp))
+        Text("${if (dir == "SELL") "▼" else "▲"} $asset", color = if (dir == "SELL") C.down else C.up,
+            fontSize = 13.sp, fontWeight = FontWeight.Bold)
+        Text(" ×${trades.size}", color = C.muted, fontSize = 10.sp)
+        Spacer(Modifier.weight(1f))
+        Text(signedMoney(net), color = pnlColor(net), fontFamily = MonoNum, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+    }
+    if (open) trades.forEach { (a, t) -> TradeCard(a, t, onChanged) }
+}
+
+@Composable
+private fun TradeCard(a: Account, t: Trade, onChanged: () -> Unit) {
     val watchOnly = a.mode == "watch"
-    Text(a.name, color = C.accent, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
-    Text("equity ${a.equity?.let { money(it) } ?: "?"} · open ${a.openPnl?.let { signedMoney(it) } ?: "?"}",
-        color = pnlColor(a.openPnl), fontFamily = MonoNum, fontSize = 9.sp, maxLines = 1)
-    a.order?.let { o -> Text("🖲 ${o.side ?: ""} ${o.asset ?: ""} · ${o.status ?: ""}${o.why?.let { " · $it" } ?: ""}",
-        color = statusColor(o.status), fontSize = 9.sp, textAlign = TextAlign.Center, maxLines = 3) }
-    a.closing?.let { c -> Text("✖ ${c.asset ?: ""} · ${c.status ?: ""}${c.why?.let { " · $it" } ?: ""}",
-        color = statusColor(c.status), fontSize = 9.sp, textAlign = TextAlign.Center, maxLines = 3) }
-    a.trades.forEach { t ->
+    Spacer(Modifier.height(4.dp))
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(C.panel).padding(horizontal = 8.dp, vertical = 6.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("${a.name}${a.equity?.let { " · ${money(it)}" } ?: ""}", color = C.accent, fontSize = 9.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+            Spacer(Modifier.weight(1f))
+            Text(t.pnl?.let { signedMoney(it) } ?: "?", color = pnlColor(t.pnl), fontFamily = MonoNum, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        }
+        Line("lot", t.lot?.let { trimNum(it) } ?: "?", C.text)
+        Line("in→now", "${fmtPrice(t.fill)} → ${fmtPrice(t.now)}", C.text)
+        Line("R", t.r?.let { "%+.2f".format(it) } ?: "—", pnlColor(t.r))
+        Line("SL", t.sl?.let { fmtPrice(it) + (t.lockedR?.let { r -> " ·locks ${"%+.2f".format(r)}R" } ?: "") } ?: "NOT SET", if (t.sl == null) C.gold else C.text)
+        t.trailSl?.let { Line("🛡 trail", fmtPrice(it), C.gold) }
+        Line("TP", t.tp?.let { fmtPrice(it) } ?: "—", C.text)
         Spacer(Modifier.height(4.dp))
-        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(C.panel).padding(horizontal = 8.dp, vertical = 6.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("${if (t.dir == "SELL") "▼" else "▲"} ${t.asset}", color = if (t.dir == "SELL") C.down else C.up,
-                    fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.weight(1f))
-                Text(t.pnl?.let { signedMoney(it) } ?: "?", color = pnlColor(t.pnl), fontFamily = MonoNum, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-            }
-            Line("lot", t.lot?.let { trimNum(it) } ?: "?", C.text)
-            Line("in→now", "${fmtPrice(t.fill)} → ${fmtPrice(t.now)}", C.text)
-            Line("R", t.r?.let { "%+.2f".format(it) } ?: "—", pnlColor(t.r))
-            Line("SL", t.sl?.let { fmtPrice(it) + (t.lockedR?.let { r -> " ·locks ${"%+.2f".format(r)}R" } ?: "") } ?: "NOT SET", if (t.sl == null) C.gold else C.text)
-            t.trailSl?.let { Line("🛡 trail", fmtPrice(it), C.gold) }
-            Line("TP", t.tp?.let { fmtPrice(it) } ?: "—", C.text)
-            Spacer(Modifier.height(4.dp))
-            if (watchOnly) {
-                Text("👁 watch-only — close it in MT5", color = C.muted, fontSize = 9.sp)
-            } else {
-                var res by remember(t.positionId) { mutableStateOf<String?>(null) }
-                HoldBar(3, "✖ hold 3s → close ${t.asset}", C.down) {
-                    res = when (val r = Orders.signed("close", mapOf("inst" to a.inst, "asset" to t.asset, "position_id" to t.positionId))) {
-                        is WoResult.Ok -> "✖ close sent to ${a.name}"
-                        is WoResult.Err -> "❌ ${r.why}"
-                        is WoResult.Unpaired -> "🔐 ${r.why}"
-                    }
-                    onChanged()
+        if (watchOnly) {
+            Text("👁 watch-only — close it in MT5", color = C.muted, fontSize = 9.sp)
+        } else {
+            var res by remember(t.positionId) { mutableStateOf<String?>(null) }
+            HoldBar(3, "✖ hold 3s → close ${t.asset} · ${a.name}", C.down) {
+                res = when (val r = Orders.signed("close", mapOf("inst" to a.inst, "asset" to t.asset, "position_id" to t.positionId))) {
+                    is WoResult.Ok -> "✖ close sent to ${a.name}"
+                    is WoResult.Err -> "❌ ${r.why}"
+                    is WoResult.Unpaired -> "🔐 ${r.why}"
                 }
-                res?.let { Text(it, color = C.muted, fontSize = 9.sp, textAlign = TextAlign.Center) }
+                onChanged()
             }
+            res?.let { Text(it, color = C.muted, fontSize = 9.sp, textAlign = TextAlign.Center) }
         }
     }
 }
