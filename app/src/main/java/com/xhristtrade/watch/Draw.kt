@@ -169,12 +169,11 @@ fun LrcBar(ind: Ind, modifier: Modifier) {
             drawLine(C.text.copy(alpha = 0.9f), Offset(x0, yL), Offset(x0 + tubeW, yL), strokeWidth = 1.6f)
             // EMA9 — the YELLOW line
             E?.let { drawLine(C.lrcYellow, Offset(x0 - 5f, y(it)), Offset(x0 + tubeW + 5f, y(it)), strokeWidth = 2.4f, cap = StrokeCap.Round) }
-            // PRICE marker — white level line + candle-colour puck
+            // PRICE marker — just the candle-colour puck (no redundant level line); EMA9 is the yellow line above
             P?.let {
                 val cy = y(it); val cx = w / 2f
-                drawLine(C.text, Offset(x0 - 4f, cy), Offset(x0 + tubeW + 4f, cy), strokeWidth = 2f, cap = StrokeCap.Round)
-                drawCircle(C.bg, radius = tubeW * 0.40f, center = Offset(cx, cy))
-                drawCircle(indColor(ind), radius = tubeW * 0.32f, center = Offset(cx, cy))
+                drawCircle(C.bg, radius = tubeW * 0.42f, center = Offset(cx, cy))
+                drawCircle(indColor(ind), radius = tubeW * 0.34f, center = Offset(cx, cy))
             }
         } else {
             // no rails yet → a simple position dot by bc

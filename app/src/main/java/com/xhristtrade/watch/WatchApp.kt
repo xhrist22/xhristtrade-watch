@@ -30,6 +30,7 @@ import androidx.wear.compose.material.Scaffold
 import androidx.wear.compose.material.Text
 import androidx.wear.compose.material.TimeText
 import androidx.wear.remote.interactions.RemoteActivityHelper
+import com.google.android.gms.wearable.Wearable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
@@ -235,7 +236,12 @@ private fun HoldToPhoneButton(symbol: String?, assetName: String) {
                     val job = scope.launch {
                         while (true) {
                             prog = ((System.currentTimeMillis() - start) / 5000f).coerceAtMost(1f)
-                            if (prog >= 1f) { openAssetOnPhone(ctx, symbol, assetName); break }
+                            if (prog >= 1f) {
+                                // steer the OPEN phone QT to this asset, in place — no browser, no reload
+                                val ok = Net.postFocus(symbol)
+                                Toast.makeText(ctx, if (ok) "$assetName → your phone chart" else "Couldn't reach the server", Toast.LENGTH_SHORT).show()
+                                break
+                            }
                             delay(30)
                         }
                     }
@@ -249,24 +255,9 @@ private fun HoldToPhoneButton(symbol: String?, assetName: String) {
             Box(Modifier.fillMaxWidth(prog).fillMaxHeight().clip(RoundedCornerShape(18.dp)).background(C.accent.copy(alpha = 0.55f)))
         }
         Text(
-            if (prog > 0f) "keep holding… ${(5 - prog * 5).toInt().coerceAtLeast(0)}s" else "📱 hold 5s → $assetName on phone",
+            if (prog > 0f) "keep holding… ${(5 - prog * 5).toInt().coerceAtLeast(0)}s" else "📱 hold 5s → $assetName on phone chart",
             color = C.text, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
         )
-    }
-}
-
-private fun openAssetOnPhone(ctx: android.content.Context, symbol: String, assetName: String) {
-    try {
-        val helper = RemoteActivityHelper(ctx)
-        val url = BuildConfig.PHONE_URL.trimEnd('/') + "/?view=" + Uri.encode(symbol) + "&tf=1m"
-        val intent = Intent(Intent.ACTION_VIEW).addCategory(Intent.CATEGORY_BROWSABLE).setData(Uri.parse(url))
-        val future = helper.startRemoteActivity(intent)
-        future.addListener({
-            val ok = try { future.get(); true } catch (e: Exception) { false }
-            Toast.makeText(ctx, if (ok) "Opening $assetName on your phone" else "Couldn't reach the phone", Toast.LENGTH_SHORT).show()
-        }, ContextCompat.getMainExecutor(ctx))
-    } catch (e: Exception) {
-        Toast.makeText(ctx, "Couldn't open on the phone", Toast.LENGTH_SHORT).show()
     }
 }
 
@@ -366,19 +357,33 @@ private fun HubPage(count: Int, updatedAt: Long, error: String?) {
     }
 }
 
+// Opens QT on the PHONE (not the desktop): send the remote-open intent to the NEARBY phone node specifically.
+// If QT is installed as an app/PWA on the phone it opens there; otherwise the phone's browser (never the desktop).
 private fun openOnPhone(ctx: android.content.Context) {
+    val helper = RemoteActivityHelper(ctx)
+    val intent = Intent(Intent.ACTION_VIEW)
+        .addCategory(Intent.CATEGORY_BROWSABLE)
+        .setData(Uri.parse(BuildConfig.PHONE_URL))
+    fun fire(nodeId: String?) {
+        try {
+            val future = helper.startRemoteActivity(intent, nodeId)
+            future.addListener({
+                val ok = try { future.get(); true } catch (e: Exception) { false }
+                Toast.makeText(ctx, if (ok) "Opening on your phone" else "Couldn't reach the phone", Toast.LENGTH_SHORT).show()
+            }, ContextCompat.getMainExecutor(ctx))
+        } catch (e: Exception) {
+            Toast.makeText(ctx, "Couldn't open on the phone", Toast.LENGTH_SHORT).show()
+        }
+    }
     try {
-        val helper = RemoteActivityHelper(ctx)
-        val intent = Intent(Intent.ACTION_VIEW)
-            .addCategory(Intent.CATEGORY_BROWSABLE)
-            .setData(Uri.parse(BuildConfig.PHONE_URL))
-        val future = helper.startRemoteActivity(intent)
-        future.addListener({
-            val ok = try { future.get(); true } catch (e: Exception) { false }
-            Toast.makeText(ctx, if (ok) "Opening on your phone" else "Couldn't reach the phone", Toast.LENGTH_SHORT).show()
-        }, ContextCompat.getMainExecutor(ctx))
+        Wearable.getNodeClient(ctx).connectedNodes
+            .addOnSuccessListener { nodes ->
+                val phone = nodes.firstOrNull { it.isNearby } ?: nodes.firstOrNull()
+                fire(phone?.id)
+            }
+            .addOnFailureListener { fire(null) }
     } catch (e: Exception) {
-        Toast.makeText(ctx, "Couldn't open on the phone", Toast.LENGTH_SHORT).show()
+        fire(null)
     }
 }
 

@@ -47,4 +47,28 @@ object Net {
             conn?.disconnect()
         }
     }
+
+    // 📱 steer the OPEN phone QT page to this asset, in place (no reload). Needs the X-QT:1 write header.
+    suspend fun postFocus(symbol: String): Boolean = withContext(Dispatchers.IO) {
+        val key = BuildConfig.WATCH_KEY
+        if (key.isBlank()) return@withContext false
+        val spec = BuildConfig.BASE_URL.trimEnd('/') + "/api/qe/focus?k=" + key
+        var conn: HttpURLConnection? = null
+        try {
+            conn = (URL(spec).openConnection() as HttpURLConnection).apply {
+                connectTimeout = 8000; readTimeout = 12000
+                requestMethod = "POST"; doOutput = true
+                setRequestProperty("Content-Type", "application/json")
+                setRequestProperty("X-QT", "1")   // the server's CSRF write header
+                setRequestProperty("User-Agent", "XhristTradeWatch/1.0 (WearOS)")
+            }
+            val safe = symbol.replace("\\", "").replace("\"", "")
+            conn.outputStream.use { it.write("{\"symbol\":\"$safe\"}".toByteArray(Charsets.UTF_8)) }
+            conn.responseCode in 200..299
+        } catch (e: Exception) {
+            false
+        } finally {
+            conn?.disconnect()
+        }
+    }
 }
