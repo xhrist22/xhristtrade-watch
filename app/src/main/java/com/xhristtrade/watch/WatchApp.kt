@@ -161,8 +161,9 @@ private fun AssetCard(r: Row, idx: Int, total: Int, brokerName: String, basis: D
 
         // ── WAE ──
         r.wae?.let { w ->
-            SectionLabel("WAE · ${w.side ?: "—"}${if (w.firing) " · firing" else ""}${w.mode?.let { " · $it" } ?: ""}")
+            SectionLabel("WAE · ${w.side ?: "—"}${if (w.firing) " · firing" else ""}")
             WaeChart(w, Modifier.fillMaxWidth().height(40.dp))
+            PlanRow("mode", waeMode(w.mode, w.dying), C.text)   // ✅ active · 🪶 lite · ⏸ pause · 🥊 against · 🟠 fading
             Spacer(Modifier.height(8.dp))
         }
 
@@ -182,6 +183,7 @@ private fun AssetCard(r: Row, idx: Int, total: Int, brokerName: String, basis: D
                         // 1m & 1h LRC colour (the REAL candle rgb ● swatch), aligned on = and bordered by | :  tf = ● zone | likely move
                         LrcTfLine("1m", ind.hue, ind.pos, ind.col)
                         r.ind1h?.let { LrcTfLine("1h", it.hue, it.pos, it.col) }
+                        Text("ema9 ${ema9Where(ind.upper, ind.lower, ind.ema9)}", color = C.explosion, fontSize = 9.sp, maxLines = 1)
                     }
                     Text("▁ ${fmtPrice(sp(ind.lower))}", color = C.muted, fontFamily = MonoNum, fontSize = 9.sp)
                 }

@@ -64,6 +64,24 @@ fun lrcZone(hue: String?, pos: Double?): String = when (hue?.lowercase()) {
     else -> "—"
 }
 
+// the WAE desk mode variant with its own emoji (active / lite / pause / against / fading)
+fun waeMode(mode: String?, dying: Boolean?): String = when (mode?.lowercase()) {
+    "active", "firing", "fire" -> "✅ active"
+    "lite" -> "🪶 lite"
+    "pause", "paused", "off" -> "⏸ pause"
+    "against" -> "🥊 against"
+    "fading", "dying", "spent" -> "🟠 fading"
+    else -> if (dying == true) "🟠 fading" else (mode ?: "—")
+}
+
+// is EMA9 inside the LRC channel or pushed out past a rail?
+fun ema9Where(upper: Double?, lower: Double?, ema9: Double?): String = when {
+    ema9 == null || upper == null || lower == null -> "—"
+    ema9 > upper -> "above rail ▲ (out)"
+    ema9 < lower -> "below rail ▼ (out)"
+    else -> "in channel"
+}
+
 // what that colour most likely means for the next move
 fun lrcMeaning(hue: String?): String = when (hue?.lowercase()) {
     "blue", "cyan", "aqua" -> "stretched↑, may fade"
