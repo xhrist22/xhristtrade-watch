@@ -5,6 +5,7 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -16,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -29,6 +31,7 @@ import androidx.wear.compose.material.Text
 import androidx.wear.compose.material.TimeText
 import androidx.wear.remote.interactions.RemoteActivityHelper
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 @Composable
@@ -208,7 +211,62 @@ private fun AssetCard(r: Row, idx: Int, total: Int, brokerName: String, basis: D
             Spacer(Modifier.height(6.dp))
             Text(it, color = C.muted, fontSize = 10.sp, textAlign = TextAlign.Center)
         }
+
+        // 📱 hold 5s → open THIS asset on the phone's QT
+        Spacer(Modifier.height(10.dp))
+        HoldToPhoneButton(r.symbol, r.asset)
         Spacer(Modifier.height(18.dp))
+    }
+}
+
+// Press-and-HOLD ~5s (a bar fills); on completion RemoteActivityHelper opens this exact asset in QT on the phone
+// via QT's own deep-link ( ?view=<symbol>&tf=1m ) — non-destructive, lands straight on the asset.
+@Composable
+private fun HoldToPhoneButton(symbol: String?, assetName: String) {
+    if (symbol == null) return
+    val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var prog by remember { mutableStateOf(0f) }
+    Box(
+        Modifier.fillMaxWidth().height(36.dp).clip(RoundedCornerShape(18.dp)).background(C.panel)
+            .pointerInput(symbol) {
+                detectTapGestures(onPress = {
+                    val start = System.currentTimeMillis()
+                    val job = scope.launch {
+                        while (true) {
+                            prog = ((System.currentTimeMillis() - start) / 5000f).coerceAtMost(1f)
+                            if (prog >= 1f) { openAssetOnPhone(ctx, symbol, assetName); break }
+                            delay(30)
+                        }
+                    }
+                    tryAwaitRelease()
+                    job.cancel(); prog = 0f
+                })
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        if (prog > 0f) {
+            Box(Modifier.fillMaxWidth(prog).fillMaxHeight().clip(RoundedCornerShape(18.dp)).background(C.accent.copy(alpha = 0.55f)))
+        }
+        Text(
+            if (prog > 0f) "keep holding… ${(5 - prog * 5).toInt().coerceAtLeast(0)}s" else "📱 hold 5s → $assetName on phone",
+            color = C.text, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
+        )
+    }
+}
+
+private fun openAssetOnPhone(ctx: android.content.Context, symbol: String, assetName: String) {
+    try {
+        val helper = RemoteActivityHelper(ctx)
+        val url = BuildConfig.PHONE_URL.trimEnd('/') + "/?view=" + Uri.encode(symbol) + "&tf=1m"
+        val intent = Intent(Intent.ACTION_VIEW).addCategory(Intent.CATEGORY_BROWSABLE).setData(Uri.parse(url))
+        val future = helper.startRemoteActivity(intent)
+        future.addListener({
+            val ok = try { future.get(); true } catch (e: Exception) { false }
+            Toast.makeText(ctx, if (ok) "Opening $assetName on your phone" else "Couldn't reach the phone", Toast.LENGTH_SHORT).show()
+        }, ContextCompat.getMainExecutor(ctx))
+    } catch (e: Exception) {
+        Toast.makeText(ctx, "Couldn't open on the phone", Toast.LENGTH_SHORT).show()
     }
 }
 
