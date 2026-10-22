@@ -131,52 +131,59 @@ fun WaeChart(w: Wae, modifier: Modifier) {
     }
 }
 
-// ── LRC channel — a glass tube in the LRC colours (aqua top → red bottom), like QT's heat meter.
-//    The bright marker is PRICE's place in the channel; the orange tick is EMA9; the dashed line is fair value (mid). ──
+// ── LRC channel — properly scaled. The 2 borders are the channel EDGES (upper + lower rail); the gradient
+//    fills BETWEEN them (aqua top → yellow mid → red bottom); the YELLOW line is EMA9; the puck is price.
+//    The view is padded past the rails, so on a breakout the price puck sits OUTSIDE the rails where you can see it. ──
 @Composable
 fun LrcBar(ind: Ind, modifier: Modifier) {
     Canvas(modifier) {
         val w = size.width
         val h = size.height
-        val tubeW = w * 0.64f
+        val tubeW = w * 0.72f
         val x0 = (w - tubeW) / 2f
-        val f: Float = when {
-            ind.bc != null -> clamp01(ind.bc)
-            ind.px != null && ind.upper != null && ind.lower != null && ind.upper != ind.lower ->
-                clamp01((ind.px - ind.lower) / (ind.upper - ind.lower))
-            else -> 0.5f
-        }
-        val eF: Float? = if (ind.ema9 != null && ind.upper != null && ind.lower != null && ind.upper != ind.lower)
-            clamp01((ind.ema9 - ind.lower) / (ind.upper - ind.lower)) else null
-        fun y(frac: Float) = h - frac * h
-        val rad = tubeW / 2f
-        val cr = androidx.compose.ui.geometry.CornerRadius(rad)
+        val cr = androidx.compose.ui.geometry.CornerRadius(tubeW / 2f)
 
-        // the channel itself: ONE gradient in the LRC zone colours (top strong → bottom weak)
-        val brush = Brush.verticalGradient(
-            0f to C.lrcAqua, 0.25f to C.lrcGreen, 0.5f to C.lrcYellow, 0.75f to C.lrcOrange, 1f to C.lrcRed,
-        )
-        drawRoundRect(brush = brush, topLeft = Offset(x0, 0f),
-            size = androidx.compose.ui.geometry.Size(tubeW, h), cornerRadius = cr, alpha = 0.52f)
-        // glass sheen down the left of the tube
-        drawRoundRect(C.text.copy(alpha = 0.08f), topLeft = Offset(x0 + tubeW * 0.12f, h * 0.04f),
-            size = androidx.compose.ui.geometry.Size(tubeW * 0.24f, h * 0.92f),
-            cornerRadius = androidx.compose.ui.geometry.CornerRadius(tubeW * 0.12f))
+        // dim background = the area outside the channel
+        drawRoundRect(C.panel2.copy(alpha = 0.35f), topLeft = Offset(x0, 0f),
+            size = androidx.compose.ui.geometry.Size(tubeW, h), cornerRadius = cr)
+
+        val U = ind.upper; val L = ind.lower; val P = ind.px; val E = ind.ema9
+        if (U != null && L != null && U > L) {
+            val cw = U - L
+            val pad = cw * 0.40                     // show 40% of the channel width beyond each rail
+            val vs = listOfNotNull(U, L, P, E)
+            val hi = maxOf(U + pad, vs.max())
+            val lo = minOf(L - pad, vs.min())
+            val span = (hi - lo).coerceAtLeast(1e-9)
+            fun y(p: Double) = (h * (1.0 - (p - lo) / span)).toFloat()
+            val yU = y(U); val yL = y(L)
+
+            // channel fill BETWEEN the two rails
+            drawRect(
+                brush = Brush.verticalGradient(listOf(C.lrcAqua, C.lrcYellow, C.lrcRed), startY = yU, endY = yL),
+                topLeft = Offset(x0, yU),
+                size = androidx.compose.ui.geometry.Size(tubeW, (yL - yU).coerceAtLeast(1f)), alpha = 0.6f,
+            )
+            // the 2 LRC EDGES (upper + lower rail) — the borders
+            drawLine(C.text.copy(alpha = 0.9f), Offset(x0, yU), Offset(x0 + tubeW, yU), strokeWidth = 1.6f)
+            drawLine(C.text.copy(alpha = 0.9f), Offset(x0, yL), Offset(x0 + tubeW, yL), strokeWidth = 1.6f)
+            // EMA9 — the YELLOW line
+            E?.let { drawLine(C.lrcYellow, Offset(x0 - 5f, y(it)), Offset(x0 + tubeW + 5f, y(it)), strokeWidth = 2.4f, cap = StrokeCap.Round) }
+            // PRICE marker — white level line + candle-colour puck
+            P?.let {
+                val cy = y(it); val cx = w / 2f
+                drawLine(C.text, Offset(x0 - 4f, cy), Offset(x0 + tubeW + 4f, cy), strokeWidth = 2f, cap = StrokeCap.Round)
+                drawCircle(C.bg, radius = tubeW * 0.40f, center = Offset(cx, cy))
+                drawCircle(indColor(ind), radius = tubeW * 0.32f, center = Offset(cx, cy))
+            }
+        } else {
+            // no rails yet → a simple position dot by bc
+            val f = (ind.bc ?: 0.5).coerceIn(0.0, 1.0).toFloat()
+            drawCircle(indColor(ind), radius = tubeW * 0.32f, center = Offset(w / 2f, h * (1f - f)))
+        }
         // tube outline
         drawRoundRect(C.border, topLeft = Offset(x0, 0f),
             size = androidx.compose.ui.geometry.Size(tubeW, h), cornerRadius = cr, style = Stroke(width = 1.2f))
-        // fair-value midline (dashed)
-        drawLine(C.bg.copy(alpha = 0.5f), Offset(x0, y(0.5f)), Offset(x0 + tubeW, y(0.5f)),
-            strokeWidth = 1f, pathEffect = PathEffect.dashPathEffect(floatArrayOf(4f, 4f)))
-        // EMA9 tick (orange, like the chart's EMA9)
-        eF?.let {
-            drawLine(C.explosion, Offset(x0 - 5f, y(it)), Offset(x0 + tubeW + 5f, y(it)), strokeWidth = 2.5f, cap = StrokeCap.Round)
-        }
-        // PRICE marker — a bright level line + a puck in the current zone colour, legible on any band
-        val cy = y(f); val cx = w / 2f
-        drawLine(C.text, Offset(x0 - 4f, cy), Offset(x0 + tubeW + 4f, cy), strokeWidth = 2f, cap = StrokeCap.Round)
-        drawCircle(C.bg, radius = tubeW * 0.44f, center = Offset(cx, cy))
-        drawCircle(indColor(ind), radius = tubeW * 0.36f, center = Offset(cx, cy))
     }
 }
 

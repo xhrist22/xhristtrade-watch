@@ -171,7 +171,8 @@ private fun AssetCard(r: Row, idx: Int, total: Int, brokerName: String, basis: D
                 Column(Modifier.height(96.dp).weight(1f), verticalArrangement = Arrangement.SpaceBetween) {
                     Text("▔ ${fmtPrice(sp(ind.upper))}", color = C.muted, fontFamily = MonoNum, fontSize = 9.sp)
                     Column {
-                        Text(fmtPrice(sp(ind.px ?: r.entry)), color = indColor(ind), fontFamily = MonoNum,
+                        // the LRC (green) price reads the SAME "now" as the header, and follows the broker (sp)
+                        Text(fmtPrice(sp(r.entry ?: ind.px)), color = indColor(ind), fontFamily = MonoNum,
                             fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                         Spacer(Modifier.height(2.dp))
                         // 1m & 1h LRC colour (the REAL candle rgb ● swatch), aligned on = and bordered by | :  tf = ● zone | likely move
