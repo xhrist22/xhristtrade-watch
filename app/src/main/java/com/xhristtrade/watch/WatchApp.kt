@@ -147,10 +147,6 @@ private fun AssetCard(r: Row, idx: Int, total: Int, brokerName: String, basis: D
             Text(prettyCall(it), color = callColor(r.signal), fontSize = 11.sp, textAlign = TextAlign.Center,
                 fontWeight = FontWeight.SemiBold)
         }
-        // ✈️ how far it ALREADY WENT, in ATR (straight from the feed's own `far`, e.g. "↑0.33× ATR")
-        r.far?.let {
-            Text("✈️ went $it", color = C.muted, fontSize = 10.sp, textAlign = TextAlign.Center)
-        }
 
         // legs meter
         if (r.legs != null && r.lit != null) {
@@ -184,6 +180,11 @@ private fun AssetCard(r: Row, idx: Int, total: Int, brokerName: String, basis: D
         // ── LRC channel — bar + text aligned to the rails (top = upper rail, bottom = lower rail) ──
         r.ind?.let { ind ->
             SectionLabel("LRC")
+            // ✈️ how far it ALREADY WENT (ATR, from the feed's `far`) when price is stretched OUT past a rail; otherwise ✓ the in-channel status
+            Text(lrcSituation(r.far, ind.hue, ind.pos),
+                color = if (!r.far.isNullOrBlank()) C.explosion else C.up,
+                fontSize = 10.sp, textAlign = TextAlign.Center, maxLines = 1, modifier = Modifier.fillMaxWidth())
+            Spacer(Modifier.height(3.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 LrcBar(ind, Modifier.width(22.dp).height(96.dp))
                 Spacer(Modifier.width(12.dp))
