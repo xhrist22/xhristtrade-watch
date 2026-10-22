@@ -104,6 +104,8 @@ fun TradesPage(wo: WoUi, onChanged: () -> Unit) {
                         color = pnlColor(net), fontFamily = MonoNum, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
                     groups.forEach { (asset, list) -> AssetGroup(asset, list, onChanged) }
                 }
+                // 📆 _QT_WATCH_TRADES_24H_2026_10_23 — the day's CLOSED trades (last 24 h), held so the page keeps the record after a trade closes
+                DoneSection(f?.done.orEmpty())
             }
         }
         Spacer(Modifier.height(24.dp))
@@ -229,6 +231,45 @@ private fun describeOrder(j: org.json.JSONObject, name: String): String {
     return if (b != null) "✅ ${o.optString("side")} ${o.optString("asset")} → $name · its prices: in ${fmtPrice(b.dbl("entry"))} · SL ${fmtPrice(b.dbl("sl"))} · TP3 ${fmtPrice(b.dbl("tp3"))}"
     else "✅ ${o.optString("side")} ${o.optString("asset")} → $name · its bot moves it into that broker's prices"
 }
+
+// 📆 _QT_WATCH_TRADES_24H_2026_10_23 — the day's closed trades (last 24 h), collapsed by default: a header with the W/L tally; tap to see each.
+@Composable
+private fun DoneSection(done: List<Done>) {
+    if (done.isEmpty()) return
+    var open by remember { mutableStateOf(false) }
+    val wins = done.count { it.outcome == "win" }; val losses = done.count { it.outcome == "loss" }
+    Spacer(Modifier.height(10.dp))
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(C.panel)
+            .clickable { open = !open }.padding(horizontal = 8.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(if (open) "▾" else "▸", color = C.muted, fontSize = 11.sp, modifier = Modifier.width(13.dp))
+        Text("📆 Today", color = C.text, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        Text(" ${done.size} closed · 24h", color = C.muted, fontSize = 9.sp)
+        Spacer(Modifier.weight(1f))
+        Text("${wins}W ${losses}L", color = C.muted, fontFamily = MonoNum, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+    }
+    if (open) done.forEach { DoneCard(it) }
+}
+
+@Composable
+private fun DoneCard(d: Done) {
+    Spacer(Modifier.height(4.dp))
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(C.panel).padding(horizontal = 8.dp, vertical = 6.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("${if (d.dir == "SELL") "▼" else "▲"} ${d.asset}", color = if (d.dir == "SELL") C.down else C.up, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            d.name?.let { Text(" · $it", color = C.accent, fontSize = 9.sp, maxLines = 1) }
+            Spacer(Modifier.weight(1f))
+            Text(outcomeBadge(d.outcome), color = outcomeColor(d.outcome), fontSize = 9.sp, fontWeight = FontWeight.SemiBold)
+        }
+        Line("in→out", "${fmtPrice(d.entry)} → ${fmtPrice(d.exit)}", C.text)
+        Line("R", d.r?.let { "%+.2f".format(it) } ?: "—", pnlColor(d.r))
+        if (d.pnl != null) Line("P&L", signedMoney(d.pnl), pnlColor(d.pnl))
+    }
+}
+private fun outcomeBadge(o: String?): String = when (o) { "win" -> "✅ win"; "loss" -> "❌ loss"; "be" -> "⟂ breakeven"; else -> o ?: "closed" }
+private fun outcomeColor(o: String?): Color = when (o) { "win" -> C.up; "loss" -> C.down; else -> C.muted }
 
 @Composable
 private fun Line(label: String, value: String, color: Color) {
