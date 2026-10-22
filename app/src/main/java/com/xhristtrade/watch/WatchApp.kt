@@ -128,6 +128,9 @@ private fun AssetCard(r: Row, idx: Int, total: Int, brokerName: String, basis: D
     ) {
         Spacer(Modifier.height(20.dp)) // clear the TimeText
 
+        // 🚩 _QT_WATCH_TOP_BANNERS_2026_10_22 — on TOP, following the QT data: 🌙 market closed (last snapshot) · ⏸ bot stood down · 📅 event
+        TopBanners(r)
+
         // 🏦 which broker these prices are in — shown on EVERY page
         Text("🏦 $brokerName" + if (basis != 0.0) "  (${if (basis > 0) "+" else ""}${basis.fmt2()})" else "",
             color = C.accent, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
@@ -174,7 +177,9 @@ private fun AssetCard(r: Row, idx: Int, total: Int, brokerName: String, basis: D
         r.wae?.let { w ->
             SectionLabel("WAE · ${w.side ?: "—"}${if (w.firing) " · firing" else ""}")
             WaeChart(w, Modifier.fillMaxWidth().height(40.dp))
-            PlanRow("mode", waeMode(w.mode, w.dying), C.text)   // ✅ active · 🪶 lite · ⏸ pause · 🥊 against · 🟠 fading
+            // 🌙 _QT_WATCH_CLOSED_SNAPSHOT_2026_10_22 — when the market is shut, the mode has no live reading (was a bare "mode = —"); say it's
+            // the frozen last snapshot instead of a dash. The 🌙 CLOSED banner on top already flags the whole page as a snapshot.
+            PlanRow("mode", if (r.closed) "🌙 last snapshot" else waeMode(w.mode, w.dying), if (r.closed) C.muted else C.text)
             Spacer(Modifier.height(8.dp))
         }
 
@@ -341,6 +346,34 @@ private fun PlanRow(label: String, value: String, valueColor: Color) {
     }
 }
 
+// 🚩 _QT_WATCH_TOP_BANNERS_2026_10_22 — banners on top of the asset page, in sync with the QT data: 🌙 the market is CLOSED (so the page is its
+// last snapshot, not live) · ⏸ the BOT is stood down (no account is awake ⇒ it will NOT auto-take — manual only) · 📅 an imminent econ event
+// (red when high-impact — a fresh entry is worse right before one). Zero, one or several can stack.
+@Composable
+private fun TopBanners(r: Row) {
+    val stoodDown = r.brokers.isNotEmpty() && r.brokers.none { it.mode == "woken" || it.mode == "managing" }
+    if (r.closed) Banner("🌙 MARKET CLOSED · last snapshot", C.muted)
+    if (stoodDown) Banner("⏸ BOT STOOD DOWN · manual only", C.gold)
+    r.event?.let { e ->
+        val hi = e.impact?.contains("high", ignoreCase = true) == true
+        val whenTxt = e.mins?.let { if (it <= 0) "now" else "${it}m" } ?: ""
+        Banner("📅 ${e.title ?: "event"}${if (whenTxt.isNotEmpty()) " · $whenTxt" else ""}", if (hi) C.down else C.explosion)
+    }
+}
+
+@Composable
+private fun Banner(text: String, color: Color) {
+    Box(
+        Modifier.fillMaxWidth().padding(vertical = 2.dp)
+            .background(color.copy(alpha = 0.18f))
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text, color = color, fontSize = 10.sp, fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center, maxLines = 2, softWrap = true)
+    }
+}
+
 // 📋 _QT_WATCH_WATCHLIST_PAGE_2026_10_22 — the whole board at a glance, the SAME format as the QT watchlist and in sync (one feed): per asset
 // the ticker (tinted by its signal) + side, the price in the picked broker, and the 1m | 1h LRC candle colour (the exact rgb) with its zone —
 // the identical "1m ● zone | 1h ● zone" the QT watchlist and the asset pages draw. Swipe right from Trades to reach it.
@@ -368,7 +401,7 @@ private fun WatchlistRow(r: Row, broker: String) {
     val px = (r.entry ?: r.ind?.px)?.let { it + basis }
     Column(Modifier.fillMaxWidth()) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(r.asset, color = callColor(r.signal), fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            Text(r.asset + if (r.closed) " 🌙" else "", color = callColor(r.signal), fontWeight = FontWeight.Bold, fontSize = 13.sp)
             Spacer(Modifier.width(4.dp))
             Text(sideArrow(r.side), color = sideColor(r.side), fontSize = 11.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.weight(1f))
