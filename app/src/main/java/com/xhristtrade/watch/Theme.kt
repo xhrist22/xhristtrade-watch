@@ -58,9 +58,9 @@ fun rgbColor(col: IntArray?, hue: String?): Color =
 fun lrcZone(hue: String?, pos: Double?): String = when (hue?.lowercase()) {
     "blue", "cyan", "aqua" -> if ((pos ?: 0.0) > 1) "broke↑" else "top"
     "green" -> "upper"
-    "yellow" -> "mid"
+    "yellow" -> "middle"   // _QT_ZONE_PLAIN_WORDS_2026_10_22 — plain words ("mid"/"bot" read like jargon; "bot" looked like a trading bot)
     "orange" -> "lower"
-    "red" -> if ((pos ?: 0.0) < -1) "broke↓" else "bot"
+    "red" -> if ((pos ?: 0.0) < -1) "broke↓" else "bottom"
     else -> "—"
 }
 
