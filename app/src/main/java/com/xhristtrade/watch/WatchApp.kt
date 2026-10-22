@@ -198,7 +198,10 @@ private fun AssetCard(r: Row, idx: Int, total: Int, brokerName: String, basis: D
                         // 1m & 1h LRC colour (the REAL candle rgb ● swatch), aligned on = and bordered by | :  tf = ● zone | likely move
                         LrcTfLine("1m", ind.hue, ind.pos, ind.col)
                         r.ind1h?.let { LrcTfLine("1h", it.hue, it.pos, it.col) }
-                        Text("ema9 ${ema9Where(ind.upper, ind.lower, ind.ema9)}", color = C.explosion, fontSize = 9.sp, maxLines = 1)
+                        // 📏 _QT_WATCH_1H_EMA9_2026_10_22 — below the 1m/1h LRC lines: price vs EMA9 + in/out of channel, COLOR CODED
+                        // (green = above EMA9 / strength, red = below / weak) on BOTH clocks — the same read the market heat uses.
+                        Ema9Line("1m", ind.px, ind.ema9, ind.pos)
+                        r.ind1h?.let { Ema9Line("1h", it.px, it.ema9, it.pos) }
                     }
                     Text("▁ ${fmtPrice(sp(ind.lower))}", color = C.muted, fontFamily = MonoNum, fontSize = 9.sp)
                 }
@@ -328,10 +331,26 @@ private fun PlanRow(label: String, value: String, valueColor: Color) {
         Text(label, color = C.muted, fontSize = 11.sp, fontFamily = MonoNum,
             textAlign = TextAlign.End, maxLines = 1, modifier = Modifier.width(46.dp))
         Text(" = ", color = C.muted, fontSize = 11.sp, fontFamily = MonoNum)
-        // 📐 _QT_PLANROW_WRAPS_2026_10_22 — constrain the value to the remaining row width and let it WRAP (was unbounded + maxLines 1, so a
-        // long value — the TP3 source, the SL atr, the hit% — overran the screen edge and was CLIPPED). Now the full text always shows.
+        // 📐 _QT_PLANROW_WRAPS_2026_10_22 — constrain the value to the remaining row width and WRAP with NO line cap, so a long "means"
+        // sentence (e.g. "sellers won but stretched down — a bounce is common") shows IN FULL. A maxLines=2 cap clipped it at "wait for";
+        // unbounded + maxLines 1 overran the screen edge. Unlimited wrap = every value, every variant, complete — never cut off.
         Text(value, color = valueColor, fontSize = 11.sp, fontFamily = MonoNum,
-            maxLines = 2, softWrap = true, modifier = Modifier.weight(1f))
+            softWrap = true, modifier = Modifier.weight(1f))
+    }
+}
+
+// 📏 _QT_WATCH_1H_EMA9_2026_10_22 — one small colour-coded line per clock under the LRC colours: ▲ above / ▼ below EMA9 (green / red) and
+// whether price is still in the channel or broke a rail. 1m from `ind`, 1h from `ind_1h` (both carry px + ema9 now) — in sync with the chart.
+@Composable
+private fun Ema9Line(tf: String, px: Double?, ema9: Double?, pos: Double?) {
+    val known = px != null && ema9 != null
+    val above = px != null && ema9 != null && px >= ema9
+    val e9 = if (!known) "ema9 —" else if (above) "▲ above EMA9" else "▼ below EMA9"
+    val ch = when { pos == null -> ""; pos > 1.0 -> " · broke ↑"; pos < -1.0 -> " · broke ↓"; else -> " · in ch" }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text("$tf =", color = C.muted, fontSize = 9.sp, fontFamily = MonoNum, modifier = Modifier.width(32.dp))
+        Text("$e9$ch", color = if (!known) C.muted else if (above) C.up else C.down,
+            fontSize = 9.sp, fontFamily = MonoNum, softWrap = true, modifier = Modifier.weight(1f))
     }
 }
 
