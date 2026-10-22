@@ -214,25 +214,22 @@ private fun AssetCard(r: Row, idx: Int, total: Int, brokerName: String, basis: D
             val tag = if (s.green) (if (s.pays) "🟩 pays" else "🟩") else "🟧"
             val atr = s.atrAway?.let { " ·${it.fmt1()}×ATR" } ?: ""
             PlanRow("SL", "$tag ${fmtPrice(sp(s.price))}$atr", if (s.green) C.up else C.gold)
+            // 📊 _QT_WATCH_HIT_ODDS_OWN_ROW_2026_10_22 — the "chance it gets hit" (reach_pct, history magnet) sits on its OWN row with a
+            // 3-char label and a tiny value ("📊 SL 58%") directly under the level it belongs to. A combined "SL n% · TP3 n%" line was
+            // still too wide and the round watch clipped the TP3 tail; a value this short can NEVER be clipped.
+            s.reachPct?.let { PlanRow("hit", "📊 SL $it%", C.muted) }
             s.rr?.let { PlanRow("RR", "%.2f".format(it), rrColor(it)) }
         }
         r.target?.let { t ->
             val src = t.from?.let { " ·$it" } ?: ""
             PlanRow("TP3", "📈 ${fmtPrice(sp(t.price))}$src", C.text)
+            t.reachPct?.let { PlanRow("hit", "📊 TP3 $it%", C.muted) }   // 📊 chance price REACHES TP3 — own short row, never clipped
             if (r.stop?.rr == null) t.rr?.let { PlanRow("RR", "%.2f".format(it), rrColor(it)) }
         }
-        // 📊 _QT_WATCH_HIT_ODDS_OWN_ROW_2026_10_22 — the SL/TP3 "chance it gets hit" (reach_pct from the history magnet) used to ride
-        // at the END of the long SL/TP3 value lines, so the watch clipped the number off the right edge and Sam saw only "·hit".
-        // Give the odds their own short, always-visible aligned row: 📊 SL <n>% · TP3 <n>% — the number can never be clipped now.
-        run {
-            val slPct = r.stop?.reachPct
-            val tpPct = r.target?.reachPct
-            if (slPct != null || tpPct != null) {
-                val parts = ArrayList<String>(2)
-                if (slPct != null) parts.add("SL $slPct%")
-                if (tpPct != null) parts.add("TP3 $tpPct%")
-                PlanRow("hit%", "📊 ${parts.joinToString(" · ")}", C.text)
-            }
+        // 🎞 _QT_WATCH_1H_TAPE_2026_10_22 — below the hit rows: the 1h tape (who hit harder) + a plain "means", in sync with the QT candle card
+        r.tape?.let { tp ->
+            if (tp.buy != null && tp.sell != null) PlanRow("tape", "buyers ${tp.buy}% · sellers ${tp.sell}%", C.text)
+            tp.means?.let { PlanRow("means", it, C.muted) }
         }
         r.backup?.let { b -> PlanRow("2nd SL", "🟧 ${fmtPrice(sp(b.price))}", C.gold) }
 
@@ -331,7 +328,10 @@ private fun PlanRow(label: String, value: String, valueColor: Color) {
         Text(label, color = C.muted, fontSize = 11.sp, fontFamily = MonoNum,
             textAlign = TextAlign.End, maxLines = 1, modifier = Modifier.width(46.dp))
         Text(" = ", color = C.muted, fontSize = 11.sp, fontFamily = MonoNum)
-        Text(value, color = valueColor, fontSize = 11.sp, fontFamily = MonoNum, maxLines = 1)
+        // 📐 _QT_PLANROW_WRAPS_2026_10_22 — constrain the value to the remaining row width and let it WRAP (was unbounded + maxLines 1, so a
+        // long value — the TP3 source, the SL atr, the hit% — overran the screen edge and was CLIPPED). Now the full text always shows.
+        Text(value, color = valueColor, fontSize = 11.sp, fontFamily = MonoNum,
+            maxLines = 2, softWrap = true, modifier = Modifier.weight(1f))
     }
 }
 
