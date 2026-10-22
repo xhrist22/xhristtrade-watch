@@ -16,8 +16,9 @@ data class Ind(
     val hue: String?,       // "aqua" / "yellow" / "red" — the candle temperature word
 )
 
-// the 1h LRC candle colour (compact — just what the 1m/1h lines need)
-data class Lrc1h(val hue: String?, val pos: Double?, val col: IntArray?)
+// the 1h LRC candle colour + the 1h EMA9 read (px vs ema9, and ema9's own place in the channel) so the watch shows the SAME
+// "above / below EMA9 · in / out of channel" status on the hour that it shows on the minute — color-coded, in sync with the chart
+data class Lrc1h(val hue: String?, val pos: Double?, val col: IntArray?, val px: Double?, val ema9: Double?, val e9: Double?)
 
 data class Kuru(
     val series: List<DoubleArray>, // each: [k1 (Lead), k2 (2x), k4 (4x)]
@@ -156,6 +157,7 @@ fun parseFeed(body: String): Feed {
         val i1hO = o.objn("ind_1h")
         val ind1h = if (i1hO == null) null else Lrc1h(
             hue = i1hO.strn("hue"), pos = i1hO.dbl("pos"), col = parseRgb(i1hO.strn("col")),
+            px = i1hO.dbl("px"), ema9 = i1hO.dbl("ema9"), e9 = i1hO.dbl("e9"),
         )
 
         val kO = o.objn("kuru")
