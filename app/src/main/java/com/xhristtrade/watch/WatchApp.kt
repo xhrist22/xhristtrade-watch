@@ -213,15 +213,26 @@ private fun AssetCard(r: Row, idx: Int, total: Int, brokerName: String, basis: D
         r.stop?.let { s ->
             val tag = if (s.green) (if (s.pays) "🟩 pays" else "🟩") else "🟧"
             val atr = s.atrAway?.let { " ·${it.fmt1()}×ATR" } ?: ""
-            val hit = s.reachPct?.let { " ·hit ${it}%" } ?: ""   // 📊 history chance price reaches the SL
-            PlanRow("SL", "$tag ${fmtPrice(sp(s.price))}$atr$hit", if (s.green) C.up else C.gold)
+            PlanRow("SL", "$tag ${fmtPrice(sp(s.price))}$atr", if (s.green) C.up else C.gold)
             s.rr?.let { PlanRow("RR", "%.2f".format(it), rrColor(it)) }
         }
         r.target?.let { t ->
-            val reach = t.reachPct?.let { " ·hit ${it}%" } ?: ""   // 📊 history chance price reaches TP3
             val src = t.from?.let { " ·$it" } ?: ""
-            PlanRow("TP3", "📈 ${fmtPrice(sp(t.price))}$reach$src", C.text)
+            PlanRow("TP3", "📈 ${fmtPrice(sp(t.price))}$src", C.text)
             if (r.stop?.rr == null) t.rr?.let { PlanRow("RR", "%.2f".format(it), rrColor(it)) }
+        }
+        // 📊 _QT_WATCH_HIT_ODDS_OWN_ROW_2026_10_22 — the SL/TP3 "chance it gets hit" (reach_pct from the history magnet) used to ride
+        // at the END of the long SL/TP3 value lines, so the watch clipped the number off the right edge and Sam saw only "·hit".
+        // Give the odds their own short, always-visible aligned row: 📊 SL <n>% · TP3 <n>% — the number can never be clipped now.
+        run {
+            val slPct = r.stop?.reachPct
+            val tpPct = r.target?.reachPct
+            if (slPct != null || tpPct != null) {
+                val parts = ArrayList<String>(2)
+                if (slPct != null) parts.add("SL $slPct%")
+                if (tpPct != null) parts.add("TP3 $tpPct%")
+                PlanRow("hit%", "📊 ${parts.joinToString(" · ")}", C.text)
+            }
         }
         r.backup?.let { b -> PlanRow("2nd SL", "🟧 ${fmtPrice(sp(b.price))}", C.gold) }
 
