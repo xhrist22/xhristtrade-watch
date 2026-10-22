@@ -80,6 +80,8 @@ dependencies {
     implementation("androidx.wear.compose:compose-material:1.3.1")
     implementation("androidx.wear.compose:compose-foundation:1.3.1")
     implementation("androidx.activity:activity-compose:1.9.2")
+    // 🔋 _QT_WATCH_BATTERY_LIFECYCLE_2026_10_23 — repeatOnLifecycle + LocalLifecycleOwner so polling pauses when the screen is off
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.4")
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.wear:wear-remote-interactions:1.0.0")
     implementation("com.google.android.gms:play-services-wearable:18.1.0")
