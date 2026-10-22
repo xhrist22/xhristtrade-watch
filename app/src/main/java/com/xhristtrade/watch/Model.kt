@@ -55,6 +55,9 @@ data class Target(
     val reachPct: Int?,
 )
 
+// 🎞 the 1h tape read — who hit harder over the last CLOSED hour (buy% vs sell%) + a plain-English "means", in sync with the QT candle card
+data class Tape(val buy: Int?, val sell: Int?, val means: String?)
+
 data class Row(
     val asset: String,
     val symbol: String?,
@@ -81,6 +84,7 @@ data class Row(
     val wae: Wae?,
     val spark: List<Double>,       // 30 one-minute closes
     val brokers: List<Broker>,     // every account incl. the 2 FTMO, each with its gap on this asset (watch-only field)
+    val tape: Tape?,               // 🎞 the 1h tape (who hit harder) + plain means
 )
 
 // a broker/account you can price the board in — name, its gap vs the chart on THIS asset (null = never measured), its mode
@@ -181,6 +185,8 @@ fun parseFeed(body: String): Feed {
             price = tO.dbl("price"), rr = tO.dbl("rr"), from = tO.strn("from"),
             magnet = tO.boolf("magnet"), reachPct = tO.intn("reach_pct"),
         )
+        val tpO = o.objn("tape")
+        val tape = if (tpO == null) null else Tape(buy = tpO.intn("buy"), sell = tpO.intn("sell"), means = tpO.strn("means"))
 
         rows.add(
             Row(
@@ -217,6 +223,7 @@ fun parseFeed(body: String): Feed {
                     }
                     out
                 },
+                tape = tape,
             )
         )
     }
@@ -227,11 +234,7 @@ fun parseFeed(body: String): Feed {
 fun fmtPrice(v: Double?): String {
     if (v == null) return "—"
     val a = kotlin.math.abs(v)
-    val dp = when {
-        a >= 1000 -> 1
-        a >= 10 -> 2
-        a >= 1 -> 3
-        else -> 5
-    }
+    // 🔢 _QT_PRICE_2DP_2026_10_22 — 2 decimals for every normal-priced value (≥ $1), matching the QT app + watchlist; sub-$1 keeps 5dp.
+    val dp = if (a >= 1.0) 2 else 5
     return "%,.${dp}f".format(v)
 }
