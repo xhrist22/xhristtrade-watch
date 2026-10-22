@@ -21,7 +21,12 @@ data class Account(
     val order: Pending?, val closing: Pending?, val trades: List<Trade>,
 )
 data class RosterAcct(val inst: String, val name: String, val mode: String?)
-data class TradesFeed(val accounts: List<Account>, val roster: List<RosterAcct>, val off: Boolean)
+// 📆 a trade the bots CLOSED in the last 24 h (the day's record the Trades page holds — _QT_WATCH_TRADES_24H_2026_10_23)
+data class Done(
+    val asset: String, val dir: String?, val entry: Double?, val exit: Double?, val r: Double?, val pnl: Double?,
+    val outcome: String?, val lot: Double?, val name: String?, val closedTs: Double?,
+)
+data class TradesFeed(val accounts: List<Account>, val roster: List<RosterAcct>, val off: Boolean, val done: List<Done>)
 
 sealed class WoResult {
     data class Ok(val json: JSONObject) : WoResult()
@@ -99,5 +104,12 @@ fun parseTrades(j: JSONObject): TradesFeed {
         val o = ra!!.getJSONObject(i)
         roster += RosterAcct(o.optString("inst"), o.optString("name"), o.strn("mode"))
     }
-    return TradesFeed(accts, roster, j.optBoolean("off", false))
+    val done = mutableListOf<Done>()
+    val da = j.optJSONArray("done")
+    for (i in 0 until (da?.length() ?: 0)) {
+        val o = da!!.getJSONObject(i)
+        done += Done(o.optString("asset"), o.strn("dir"), o.dbl("entry"), o.dbl("exit"), o.dbl("r"), o.dbl("pnl"),
+            o.strn("outcome"), o.dbl("lot"), o.strn("name"), o.dbl("closed_ts"))
+    }
+    return TradesFeed(accts, roster, j.optBoolean("off", false), done)
 }
