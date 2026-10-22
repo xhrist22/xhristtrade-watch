@@ -1,0 +1,14 @@
+# Copy to  local.properties  and fill in. local.properties is gitignored — the secret never reaches git.
+# Android Studio writes sdk.dir here itself; add the three lines below.
+
+# sdk.dir=/Users/you/Library/Android/sdk
+
+# The viewer feed base (public viewer domain). No secret.
+BASE_URL=https://xhristtrade.com
+
+# The dedicated watch viewer code. Read it from the server, never paste it anywhere public:
+#   ssh vps 'cat /root/qt/watch_key.txt'
+WATCH_KEY=
+
+# The QT URL the "Open on phone" button opens in your phone browser (your owner door).
+PHONE_URL=https://terminal.xhristtrade.com

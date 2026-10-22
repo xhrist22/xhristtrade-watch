@@ -1,0 +1,65 @@
+name: Wear APK → Telegram
+
+# Builds the Galaxy Watch (Wear OS) debug APK and DMs it via @xhrist22_bot.
+# The APK is debug-signed — installable with Wear Installer 2 (no keystore needed).
+#
+# Repo secrets (Settings → Secrets and variables → Actions):
+#   QT_WATCH_KEY  — the watch viewer code         (REQUIRED)
+#   TG_BOT_TOKEN  — a Telegram bot token           (REQUIRED to DM)
+#   TG_CHAT_ID    — your Telegram DM id             (REQUIRED to DM)
+#   QT_BASE_URL   — optional (default https://xhristtrade.com)
+#   QT_PHONE_URL  — optional (default https://terminal.xhristtrade.com)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Bootstrap the Gradle wrapper
+        run: |
+          curl -sL https://services.gradle.org/distributions/gradle-8.7-bin.zip -o /tmp/g.zip
+          unzip -q /tmp/g.zip -d /tmp/gradle
+          /tmp/gradle/gradle-8.7/bin/gradle wrapper --gradle-version 8.7 --no-daemon
+
+      - name: Build debug APK
+        env:
+          BASE_URL: ${{ secrets.QT_BASE_URL }}
+          WATCH_KEY: ${{ secrets.QT_WATCH_KEY }}
+          PHONE_URL: ${{ secrets.QT_PHONE_URL }}
+        run: ./gradlew :app:assembleDebug --no-daemon --stacktrace
+
+      - name: Upload APK as a build artifact
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: xhristtrade-watch-apk
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: ignore
+
+      - name: DM the APK to Telegram
+        if: ${{ success() }}
+        run: |
+          APK=$(find app/build/outputs/apk/debug -name "*.apk" | head -1)
+          if [ -z "$APK" ]; then echo "no apk found"; exit 1; fi
+          if [ -z "${{ secrets.TG_BOT_TOKEN }}" ] || [ -z "${{ secrets.TG_CHAT_ID }}" ]; then
+            echo "TG secrets not set — skipping send (APK is in the artifact)."; exit 0
+          fi
+          curl -sS --fail \
+            -F document=@"$APK" \
+            -F caption="⌚ XhristTrade Watch · build #${{ github.run_number }} · install with Wear Installer 2" \
+            "https://api.telegram.org/bot${{ secrets.TG_BOT_TOKEN }}/sendDocument?chat_id=${{ secrets.TG_CHAT_ID }}"
