@@ -29,6 +29,10 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          # the action's default "tools" package was removed from Google's repo and breaks the step;
+          # install exactly what compileSdk 34 needs instead
+          packages: "platform-tools platforms;android-34 build-tools;34.0.0"
 
       - name: Bootstrap the Gradle wrapper
         run: |
