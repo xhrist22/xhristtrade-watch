@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
@@ -261,6 +262,11 @@ private fun AssetCard(r: Row, idx: Int, total: Int, brokerName: String, basis: D
             Text(it, color = C.muted, fontSize = 10.sp, textAlign = TextAlign.Center)
         }
 
+        // 🚦 _QT_WATCH_SIGNAL_CARD_2026_10_23 — the SAME traffic light + reasons the QT watchlist / ranked dot shows (its colour and the
+        // "why" the server scored), bordered in that colour, right above the open-on-phone button so the read is at a glance on the watch.
+        Spacer(Modifier.height(12.dp))
+        SignalCard(r)
+
         // 📱 hold 3s → open THIS asset on the phone's QT
         Spacer(Modifier.height(10.dp))
         HoldToPhoneButton(r.symbol, r.asset)
@@ -268,6 +274,43 @@ private fun AssetCard(r: Row, idx: Int, total: Int, brokerName: String, basis: D
         Spacer(Modifier.height(8.dp))
         OrderHoldButton(r, brokerName, wo, onChanged)
         Spacer(Modifier.height(18.dp))
+    }
+}
+
+// 🚦 The traffic light + its reasons, bordered in the light's colour — the watch twin of the QT watchlist / ranked dot pop-up.
+// entry mode = Sam is flat (take it?) · exit mode = Sam holds the asset (hold / manage / close). Same heads + reasons as siglight.js.
+@Composable
+private fun SignalCard(r: Row) {
+    val sig = r.signal
+    if (sig != "green" && sig != "yellow" && sig != "red") return
+    val exit = r.signalMode == "exit"
+    val col = when (sig) { "green" -> C.up; "yellow" -> C.yellow; else -> C.down }
+    val dot = when (sig) { "green" -> "🟢"; "yellow" -> "🟡"; else -> "🔴" }
+    val head = if (exit) when (sig) {
+        "green" -> "HOLD — trade working"; "yellow" -> "MANAGE — tighten / take some"; else -> "CLOSE NOW"
+    } else when (sig) {
+        "green" -> "TAKE IT — press-worthy"; "yellow" -> "ALMOST — one trigger away"; else -> "FAR — stand aside"
+    }
+    val reasons = r.signalWhy?.split(" · ")?.map { it.trim() }?.filter { it.isNotEmpty() } ?: emptyList()
+    Column(
+        Modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(C.panel)
+            .border(1.dp, col, RoundedCornerShape(10.dp))
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(dot, fontSize = 12.sp)
+            Spacer(Modifier.width(5.dp))
+            Text(head, color = col, fontSize = 11.sp, fontWeight = FontWeight.Bold, softWrap = true, modifier = Modifier.weight(1f))
+        }
+        if (reasons.isEmpty()) {
+            Spacer(Modifier.height(3.dp))
+            Text("no setup read", color = C.muted, fontSize = 10.sp)
+        } else reasons.forEach {
+            Spacer(Modifier.height(3.dp))
+            Text("• $it", color = C.text, fontSize = 10.sp, softWrap = true)
+        }
     }
 }
 
