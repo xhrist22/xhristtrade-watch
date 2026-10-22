@@ -10,6 +10,8 @@
 .cxx/
 *.apk
 *.aab
+*.keystore
+*.jks
 app/build/
 build/
 # Keep the wrapper jar out of git is NOT desired — Android Studio / `gradle wrapper` regenerates it.

@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -53,19 +54,28 @@ fun WatchApp() {
         }
     }
 
+    var broker by remember { mutableStateOf("Chart") }   // default: the engine / chart price
+
     Scaffold(timeText = { TimeText() }) {
         Box(Modifier.fillMaxSize().background(C.bg)) {
             if (rows.isEmpty()) {
                 SplashOrError(error)
             } else {
-                // ♾ looping deck — swiping past the last page wraps smartly back to the first (both directions).
-                // A big virtual page count started in the middle gives seamless wrap with no snap.
-                val real = rows.size + 1                 // assets + the hub page
+                // page 0 = BROKER PICKER · 1..N = assets re-priced to the pick · last = hub. Loops both ways, starts on the picker.
+                val brokers = rows.firstOrNull()?.brokers ?: emptyList()
+                val real = rows.size + 2
                 val pager = rememberPagerState(initialPage = real * 1000, pageCount = { real * 2000 })
                 HorizontalPager(state = pager, modifier = Modifier.fillMaxSize()) { page ->
                     val idx = ((page % real) + real) % real
-                    if (idx < rows.size) AssetCard(rows[idx], idx, rows.size)
-                    else HubPage(rows.size, updatedAt, error)
+                    when {
+                        idx == 0 -> BrokerPicker(brokers, broker) { broker = it }
+                        idx <= rows.size -> {
+                            val r = rows[idx - 1]
+                            val basis = if (broker == "Chart") 0.0 else (r.brokers.firstOrNull { it.name == broker }?.basis ?: 0.0)
+                            AssetCard(r, idx - 1, rows.size, broker, basis)
+                        }
+                        else -> HubPage(rows.size, updatedAt, error)
+                    }
                 }
             }
         }
@@ -90,13 +100,18 @@ private fun SplashOrError(error: String?) {
 }
 
 @Composable
-private fun AssetCard(r: Row, idx: Int, total: Int) {
+private fun AssetCard(r: Row, idx: Int, total: Int, brokerName: String, basis: Double) {
+    fun sp(v: Double?): Double? = v?.let { it + basis }   // shift a chart price into the selected broker's price
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState())
             .padding(horizontal = 14.dp, vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Spacer(Modifier.height(22.dp)) // clear the TimeText
+        Spacer(Modifier.height(20.dp)) // clear the TimeText
+
+        // 🏦 which broker these prices are in — shown on EVERY page
+        Text("🏦 $brokerName" + if (basis != 0.0) "  (${if (basis > 0) "+" else ""}${basis.fmt2()})" else "",
+            color = C.accent, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
 
         // ── header: asset · side · price ──
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -104,7 +119,7 @@ private fun AssetCard(r: Row, idx: Int, total: Int) {
             Spacer(Modifier.width(6.dp))
             Text(sideArrow(r.side), color = sideColor(r.side), fontSize = 15.sp, fontWeight = FontWeight.Bold)
         }
-        Text(fmtPrice(r.entry), color = C.text, fontFamily = MonoNum, fontSize = 15.sp)
+        Text(fmtPrice(sp(r.entry)), color = C.text, fontFamily = MonoNum, fontSize = 15.sp)
         // dots = which page
         Text(dots(idx, total), color = C.muted, fontSize = 9.sp)
 
@@ -154,16 +169,16 @@ private fun AssetCard(r: Row, idx: Int, total: Int) {
                 LrcBar(ind, Modifier.width(22.dp).height(96.dp))
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.height(96.dp).weight(1f), verticalArrangement = Arrangement.SpaceBetween) {
-                    Text("▔ ${fmtPrice(ind.upper)}", color = C.muted, fontFamily = MonoNum, fontSize = 9.sp)
+                    Text("▔ ${fmtPrice(sp(ind.upper))}", color = C.muted, fontFamily = MonoNum, fontSize = 9.sp)
                     Column {
-                        Text(fmtPrice(ind.px ?: r.entry), color = indColor(ind), fontFamily = MonoNum,
+                        Text(fmtPrice(sp(ind.px ?: r.entry)), color = indColor(ind), fontFamily = MonoNum,
                             fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                         Spacer(Modifier.height(2.dp))
-                        // 1m & 1h LRC colour, aligned on = and bordered by | :  tf = zone | what it likely means
-                        LrcTfLine("1m", ind.hue, ind.pos)
-                        r.ind1h?.let { LrcTfLine("1h", it.hue, it.pos) }
+                        // 1m & 1h LRC colour (the REAL candle rgb ● swatch), aligned on = and bordered by | :  tf = ● zone | likely move
+                        LrcTfLine("1m", ind.hue, ind.pos, ind.col)
+                        r.ind1h?.let { LrcTfLine("1h", it.hue, it.pos, it.col) }
                     }
-                    Text("▁ ${fmtPrice(ind.lower)}", color = C.muted, fontFamily = MonoNum, fontSize = 9.sp)
+                    Text("▁ ${fmtPrice(sp(ind.lower))}", color = C.muted, fontFamily = MonoNum, fontSize = 9.sp)
                 }
             }
             Spacer(Modifier.height(8.dp))
@@ -172,20 +187,20 @@ private fun AssetCard(r: Row, idx: Int, total: Int) {
         // ── plan: every row aligned on = like the ChartWire desk ──
         SectionLabel("PLAN")
         PlanRow("side", "${sideArrow(r.side)} ${r.side ?: "—"}", sideColor(r.side))
-        r.entry?.let { PlanRow("now", fmtPrice(it), C.text) }
+        r.entry?.let { PlanRow("now", fmtPrice(sp(it)), C.text) }
         r.stop?.let { s ->
             val tag = if (s.green) (if (s.pays) "🟩 pays" else "🟩") else "🟧"
             val atr = s.atrAway?.let { " ·${it.fmt1()}×ATR" } ?: ""
-            PlanRow("SL", "$tag ${fmtPrice(s.price)}$atr", if (s.green) C.up else C.gold)
+            PlanRow("SL", "$tag ${fmtPrice(sp(s.price))}$atr", if (s.green) C.up else C.gold)
             s.rr?.let { PlanRow("RR", "%.2f".format(it), rrColor(it)) }
         }
         r.target?.let { t ->
             val reach = t.reachPct?.let { " ·${it}%" } ?: ""
             val src = t.from?.let { " ·$it" } ?: ""
-            PlanRow("TP3", "📈 ${fmtPrice(t.price)}$reach$src", C.text)
+            PlanRow("TP3", "📈 ${fmtPrice(sp(t.price))}$reach$src", C.text)
             if (r.stop?.rr == null) t.rr?.let { PlanRow("RR", "%.2f".format(it), rrColor(it)) }
         }
-        r.backup?.let { b -> PlanRow("2nd SL", "🟧 ${fmtPrice(b.price)}", C.gold) }
+        r.backup?.let { b -> PlanRow("2nd SL", "🟧 ${fmtPrice(sp(b.price))}", C.gold) }
 
         // ── why it isn't a trade yet ──
         r.reason?.let {
@@ -203,14 +218,50 @@ private fun SectionLabel(s: String) {
     Spacer(Modifier.height(2.dp))
 }
 
-// One LRC timeframe line:  1m = 🟨 mid | coiling, no edge — wait   (aligned on =, bordered by |)
+// ── PAGE 0: the broker picker. Tap one; every asset page re-prices to it. Default = Chart. ──
 @Composable
-private fun LrcTfLine(tf: String, hue: String?, pos: Double?) {
+private fun BrokerPicker(brokers: List<Broker>, selected: String, onPick: (String) -> Unit) {
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 14.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Spacer(Modifier.height(24.dp))
+        Text("🏦 Broker", color = C.text, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+        Text("pick one — every asset follows it", color = C.muted, fontSize = 9.sp, textAlign = TextAlign.Center)
+        Spacer(Modifier.height(8.dp))
+        BrokerRow("Chart", "the engine / chart price", selected == "Chart") { onPick("Chart") }
+        brokers.forEach { b ->
+            val sub = (if (b.basis == null) "no gap yet · = chart"
+                       else "${if (b.basis >= 0) "+" else ""}${b.basis.fmt2()} vs chart") + (b.mode?.let { " · $it" } ?: "")
+            BrokerRow(b.name, sub, selected == b.name) { onPick(b.name) }
+        }
+        Spacer(Modifier.height(20.dp))
+    }
+}
+
+@Composable
+private fun BrokerRow(name: String, sub: String, on: Boolean, onClick: () -> Unit) {
+    Column(
+        Modifier.fillMaxWidth().padding(vertical = 3.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (on) C.accent.copy(alpha = 0.22f) else C.panel)
+            .clickable { onClick() }
+            .padding(horizontal = 10.dp, vertical = 7.dp),
+    ) {
+        Text((if (on) "● " else "") + name, color = if (on) C.accent else C.text, fontSize = 12.sp, maxLines = 1)
+        Text(sub, color = C.muted, fontSize = 9.sp, maxLines = 1)
+    }
+}
+
+// One LRC timeframe line:  1m = ● mid | coiling, no edge — wait   (aligned on =, bordered by |)
+@Composable
+private fun LrcTfLine(tf: String, hue: String?, pos: Double?, col: IntArray?) {
+    val c = rgbColor(col, hue)   // the EXACT candle colour — every variation, not just red/green
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(tf, color = C.muted, fontSize = 9.sp, fontFamily = MonoNum,
             textAlign = TextAlign.End, modifier = Modifier.width(18.dp))
         Text(" = ", color = C.muted, fontSize = 9.sp, fontFamily = MonoNum)
-        Text(lrcZone(hue, pos), color = hueColor(hue), fontSize = 9.sp, maxLines = 1)
+        Text("● ${lrcZone(hue, pos)}", color = c, fontSize = 9.sp, maxLines = 1)
         Text(" | ", color = C.muted, fontSize = 9.sp, fontFamily = MonoNum)
         Text(lrcMeaning(hue), color = C.muted, fontSize = 9.sp, maxLines = 1)
     }
@@ -293,6 +344,7 @@ private fun dots(idx: Int, total: Int): String {
     return sb.toString()
 }
 private fun Double.fmt1(): String = "%.1f".format(this)
+private fun Double.fmt2(): String = "%.2f".format(this)
 
 private fun freshness(updatedAt: Long, error: String?): String {
     if (error != null) return error

@@ -40,6 +40,10 @@ jobs:
           unzip -q /tmp/g.zip -d /tmp/gradle
           /tmp/gradle/gradle-8.7/bin/gradle wrapper --gradle-version 8.7 --no-daemon
 
+      - name: Decode the stable signing keystore
+        if: ${{ secrets.DEBUG_KEYSTORE_B64 != '' }}
+        run: echo "${{ secrets.DEBUG_KEYSTORE_B64 }}" | base64 -d > xt.keystore
+
       - name: Build debug APK
         env:
           BASE_URL: ${{ secrets.QT_BASE_URL }}

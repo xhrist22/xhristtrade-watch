@@ -48,13 +48,19 @@ fun hueColor(hue: String?): Color = when (hue?.lowercase()) {
     else -> C.muted
 }
 
-// short zone word (for the compact 1m / 1h lines)
+// the EXACT LRC candle colour (continuous rgb from lrc.js) — the full aqua→green→yellow→orange→red range,
+// not just 5 buckets; falls back to the zone palette only when no rgb was sent.
+fun rgbColor(col: IntArray?, hue: String?): Color =
+    if (col != null && col.size == 3) Color(col[0].coerceIn(0, 255), col[1].coerceIn(0, 255), col[2].coerceIn(0, 255))
+    else hueColor(hue)
+
+// short zone word (the colour swatch beside it carries the real candle colour)
 fun lrcZone(hue: String?, pos: Double?): String = when (hue?.lowercase()) {
-    "blue", "cyan", "aqua" -> if ((pos ?: 0.0) > 1) "🟦 broke↑" else "🟦 top"
-    "green" -> "🟩 upper"
-    "yellow" -> "🟨 mid"
-    "orange" -> "🟧 lower"
-    "red" -> if ((pos ?: 0.0) < -1) "🟥 broke↓" else "🟥 bot"
+    "blue", "cyan", "aqua" -> if ((pos ?: 0.0) > 1) "broke↑" else "top"
+    "green" -> "upper"
+    "yellow" -> "mid"
+    "orange" -> "lower"
+    "red" -> if ((pos ?: 0.0) < -1) "broke↓" else "bot"
     else -> "—"
 }
 

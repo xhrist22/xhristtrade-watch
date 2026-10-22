@@ -79,7 +79,11 @@ data class Row(
     val kuru: Kuru?,
     val wae: Wae?,
     val spark: List<Double>,       // 30 one-minute closes
+    val brokers: List<Broker>,     // every account incl. the 2 FTMO, each with its gap on this asset (watch-only field)
 )
+
+// a broker/account you can price the board in — name, its gap vs the chart on THIS asset (null = never measured), its mode
+data class Broker(val name: String, val basis: Double?, val mode: String?)
 
 data class Feed(val rows: List<Row>)
 
@@ -203,6 +207,15 @@ fun parseFeed(body: String): Feed {
                 kuru = kuru,
                 wae = wae,
                 spark = doubleList(o.arrn("spark")),
+                brokers = run {
+                    val arr = o.arrn("brokers"); val out = ArrayList<Broker>()
+                    if (arr != null) for (k in 0 until arr.length()) {
+                        val bo = arr.optJSONObject(k) ?: continue
+                        val nm = bo.strn("name") ?: continue
+                        out.add(Broker(nm, bo.dbl("basis"), bo.strn("mode")))
+                    }
+                    out
+                },
             )
         )
     }

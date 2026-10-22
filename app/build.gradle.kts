@@ -47,14 +47,27 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+    // _QT_WATCH_STABLE_KEY_2026_10_22 — one fixed key (CI decodes xt.keystore from the DEBUG_KEYSTORE_B64 secret) so every
+    // build is signed the same way and updates install OVER the old app — no uninstall/re-pair. No keystore ⇒ default debug signing.
+    signingConfigs {
+        create("stable") {
+            val ks = rootProject.file("xt.keystore")
+            if (ks.exists()) {
+                storeFile = ks
+                storePassword = "xtwatch2026"
+                keyAlias = "xt"
+                keyPassword = "xtwatch2026"
+            }
+        }
+    }
     buildTypes {
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
         debug {
-            // debug-signed APK — installable via Wear Installer 2 with no keystore setup
             isMinifyEnabled = false
+            if (rootProject.file("xt.keystore").exists()) signingConfig = signingConfigs.getByName("stable")
         }
     }
 }
