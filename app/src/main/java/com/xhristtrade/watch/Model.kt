@@ -61,6 +61,7 @@ data class Row(
     val lit: Int?,
     val legs: Int?,
     val reason: String?,
+    val far: String?,              // "↑0.33× ATR" — how far it already went (the ✈️ stretched distance)
     val signal: String?,           // "green" / "red" / …
     val signalWhy: String?,
     val lrcLeg: String?,
@@ -179,6 +180,7 @@ fun parseFeed(body: String): Feed {
                 lit = o.intn("lit"),
                 legs = o.intn("legs"),
                 reason = o.strn("reason"),
+                far = o.strn("far"),
                 signal = o.strn("signal"),
                 signalWhy = o.strn("signal_why"),
                 lrcLeg = o.strn("lrc_leg"),
