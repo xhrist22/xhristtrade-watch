@@ -22,6 +22,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.wear.compose.material.Chip
 import androidx.wear.compose.material.ChipDefaults
 import androidx.wear.compose.material.Scaffold
@@ -39,19 +42,25 @@ fun WatchApp() {
     var updatedAt by remember { mutableStateOf(0L) }
     var everLoaded by remember { mutableStateOf(false) }
 
-    // poll fast, forever; ride through a brief upstream blip (502/restart) showing the LAST data, retry quickly
+    // 🔋 _QT_WATCH_BATTERY_LIFECYCLE_2026_10_23 — poll fast while the watch face is ON, but STOP entirely when the screen turns off /
+    // the app backgrounds (wrist-down, ambient). A plain LaunchedEffect(Unit) coroutine keeps running while the Activity is merely
+    // STOPPED, so the old loop hit the network every 6 s ALL DAY = the dominant battery drain. repeatOnLifecycle(RESUMED) pauses the
+    // loop at screen-off and re-enters it — with an immediate fresh fetch — the instant you raise your wrist. No speed lost on-screen.
+    val lifecycleOwner = LocalLifecycleOwner.current
     LaunchedEffect(Unit) {
-        while (true) {
-            var ok = true
-            when (val r = Net.fetchWatch()) {
-                is FetchResult.Ok -> {
-                    if (r.feed.rows.isNotEmpty()) rows = r.feed.rows
-                    error = null; updatedAt = System.currentTimeMillis(); everLoaded = true
+        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            while (true) {
+                var ok = true
+                when (val r = Net.fetchWatch()) {
+                    is FetchResult.Ok -> {
+                        if (r.feed.rows.isNotEmpty()) rows = r.feed.rows
+                        error = null; updatedAt = System.currentTimeMillis(); everLoaded = true
+                    }
+                    is FetchResult.Err -> { ok = false; error = r.message; if (!everLoaded) rows = emptyList() }
                 }
-                is FetchResult.Err -> { ok = false; error = r.message; if (!everLoaded) rows = emptyList() }
+                // 6s when healthy (server cache is ~instant); 2.5s retry after a blip so it snaps back fast
+                delay(if (ok) 6_000 else 2_500)
             }
-            // 6s when healthy (server cache is ~instant); 2.5s retry after a blip so it snaps back fast
-            delay(if (ok) 6_000 else 2_500)
         }
     }
 
@@ -62,13 +71,16 @@ fun WatchApp() {
     var wo by remember { mutableStateOf(WoUi(null, null, null)) }
     var poke by remember { mutableStateOf(0) }
     LaunchedEffect(poke) {
-        while (true) {
-            wo = when (val r = Orders.signed("trades")) {
-                is WoResult.Ok -> WoUi(true, parseTrades(r.json), null)
-                is WoResult.Unpaired -> WoUi(false, null, null)
-                is WoResult.Err -> wo.copy(error = r.why)
+        // 🔋 same lifecycle gate as the feed loop: the signed trades read pauses when the screen is off, resumes on wrist-raise.
+        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            while (true) {
+                wo = when (val r = Orders.signed("trades")) {
+                    is WoResult.Ok -> WoUi(true, parseTrades(r.json), null)
+                    is WoResult.Unpaired -> WoUi(false, null, null)
+                    is WoResult.Err -> wo.copy(error = r.why)
+                }
+                delay(if (wo.paired == true) 4_000 else 6_000)
             }
-            delay(if (wo.paired == true) 4_000 else 6_000)
         }
     }
     val onChanged: () -> Unit = { poke++ }
