@@ -71,7 +71,7 @@ fun WatchApp() {
             delay(if (wo.paired == true) 4_000 else 6_000)
         }
     }
-    val onChanged = { poke++ }
+    val onChanged: () -> Unit = { poke++ }
 
     Scaffold(timeText = { TimeText() }) {
         Box(Modifier.fillMaxSize().background(C.bg)) {
