@@ -72,6 +72,7 @@ data class Row(
     val aligned: Boolean,
     val lit: Int?,
     val legs: Int?,
+    val rank: Int?,                // 🗂 the QT watchlist's "closest to setup first" position (desk lrc_order) — the watchlist sorts by it
     val reason: String?,
     val far: String?,              // "↑0.33× ATR" — how far it already went (the ✈️ stretched distance)
     val signal: String?,           // "green" / "red" / …
@@ -208,6 +209,7 @@ fun parseFeed(body: String): Feed {
                 aligned = o.boolf("aligned"),
                 lit = o.intn("lit"),
                 legs = o.intn("legs"),
+                rank = o.intn("rank"),
                 reason = o.strn("reason"),
                 far = o.strn("far"),
                 signal = o.strn("signal"),
