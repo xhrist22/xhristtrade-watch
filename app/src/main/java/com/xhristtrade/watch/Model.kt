@@ -59,6 +59,9 @@ data class Target(
 // 🎞 the 1h tape read — who hit harder over the last CLOSED hour (buy% vs sell%) + a plain-English "means", in sync with the QT candle card
 data class Tape(val buy: Int?, val sell: Int?, val means: String?)
 
+// 📅 the next imminent econ event for this asset (the desk's own calendar) — minutes out + impact, for the watch's event banner
+data class Ev(val title: String?, val mins: Int?, val impact: String?)
+
 data class Row(
     val asset: String,
     val symbol: String?,
@@ -86,6 +89,7 @@ data class Row(
     val spark: List<Double>,       // 30 one-minute closes
     val brokers: List<Broker>,     // every account incl. the 2 FTMO, each with its gap on this asset (watch-only field)
     val tape: Tape?,               // 🎞 the 1h tape (who hit harder) + plain means
+    val event: Ev?,                // 📅 next imminent econ event
 )
 
 // a broker/account you can price the board in — name, its gap vs the chart on THIS asset (null = never measured), its mode
@@ -189,6 +193,8 @@ fun parseFeed(body: String): Feed {
         )
         val tpO = o.objn("tape")
         val tape = if (tpO == null) null else Tape(buy = tpO.intn("buy"), sell = tpO.intn("sell"), means = tpO.strn("means"))
+        val evO = o.objn("event")
+        val event = if (evO == null) null else Ev(title = evO.strn("title"), mins = evO.intn("mins"), impact = evO.strn("impact"))
 
         rows.add(
             Row(
@@ -226,6 +232,7 @@ fun parseFeed(body: String): Feed {
                     out
                 },
                 tape = tape,
+                event = event,
             )
         )
     }
