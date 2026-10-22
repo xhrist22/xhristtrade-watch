@@ -44,6 +44,7 @@ data class Stop(
     val pays: Boolean,             // the desk blessed it (🟩)
     val kind: String?,
     val green: Boolean,
+    val reachPct: Int?,            // 📊 chance price REACHES this stop from here (history magnet) = the SL hit %
 )
 
 data class Target(
@@ -172,7 +173,7 @@ fun parseFeed(body: String): Feed {
 
         fun stopOf(so: JSONObject?): Stop? = if (so == null) null else Stop(
             price = so.dbl("price"), rr = so.dbl("rr"), atrAway = so.dbl("atr_away"),
-            pays = so.boolf("pays"), kind = so.strn("kind"), green = so.boolf("green"),
+            pays = so.boolf("pays"), kind = so.strn("kind"), green = so.boolf("green"), reachPct = so.intn("reach_pct"),
         )
 
         val tO = o.objn("target")

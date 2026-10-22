@@ -67,9 +67,15 @@ fun lrcZone(hue: String?, pos: Double?): String = when (hue?.lowercase()) {
 // 🛰️ _QT_WATCH_LRC_SITUATION_2026_10_22 — the LRC section's one-line situation: how far price ALREADY WENT in ATR when it is stretched
 // OUT past the rails (the feed's own ✈️ `far`, e.g. "↑0.33× ATR"); otherwise ✓ it is still INSIDE the channel + WHERE (the same zone
 // word the ● 1m/1h lines use). So the watch always says either "it went this far out" or "it's in, here's the status".
-fun lrcSituation(far: String?, hue: String?, pos: Double?): String =
-    if (!far.isNullOrBlank()) "✈️ went $far"
-    else "✓ in channel · ${lrcZone(hue, pos)}"
+fun lrcSituation(far: String?, hue: String?, pos: Double?): String {
+    // ✈️ _QT_FAR_ONLY_WHEN_OUT_2026_10_22 — only "went" when price is ACTUALLY past a rail (|pos| > 1); never say went while price is inside.
+    val out = pos != null && (pos > 1.0 || pos < -1.0)
+    return when {
+        out && !far.isNullOrBlank() -> "✈️ went $far"
+        out -> "✈️ went ${if ((pos ?: 0.0) > 0) "↑" else "↓"} out"
+        else -> "✓ in channel · ${lrcZone(hue, pos)}"
+    }
+}
 
 // the WAE desk mode variant with its own emoji (active / lite / pause / against / fading)
 fun waeMode(mode: String?, dying: Boolean?): String = when (mode?.lowercase()) {

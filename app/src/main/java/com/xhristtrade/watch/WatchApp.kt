@@ -213,11 +213,12 @@ private fun AssetCard(r: Row, idx: Int, total: Int, brokerName: String, basis: D
         r.stop?.let { s ->
             val tag = if (s.green) (if (s.pays) "🟩 pays" else "🟩") else "🟧"
             val atr = s.atrAway?.let { " ·${it.fmt1()}×ATR" } ?: ""
-            PlanRow("SL", "$tag ${fmtPrice(sp(s.price))}$atr", if (s.green) C.up else C.gold)
+            val hit = s.reachPct?.let { " ·hit ${it}%" } ?: ""   // 📊 history chance price reaches the SL
+            PlanRow("SL", "$tag ${fmtPrice(sp(s.price))}$atr$hit", if (s.green) C.up else C.gold)
             s.rr?.let { PlanRow("RR", "%.2f".format(it), rrColor(it)) }
         }
         r.target?.let { t ->
-            val reach = t.reachPct?.let { " ·${it}%" } ?: ""
+            val reach = t.reachPct?.let { " ·hit ${it}%" } ?: ""   // 📊 history chance price reaches TP3
             val src = t.from?.let { " ·$it" } ?: ""
             PlanRow("TP3", "📈 ${fmtPrice(sp(t.price))}$reach$src", C.text)
             if (r.stop?.rr == null) t.rr?.let { PlanRow("RR", "%.2f".format(it), rrColor(it)) }
@@ -245,9 +246,10 @@ private fun AssetCard(r: Row, idx: Int, total: Int, brokerName: String, basis: D
 private fun HoldToPhoneButton(symbol: String?, assetName: String) {
     if (symbol == null) return
     val ctx = LocalContext.current
-    HoldBar(3, "📱 hold 3s → $assetName on phone chart", C.accent) {
-        val ok = Net.postFocus(symbol)
-        Toast.makeText(ctx, if (ok) "$assetName → your phone chart" else "Couldn't reach the server", Toast.LENGTH_SHORT).show()
+    HoldBar(3, "📱 hold 3s → open $assetName on phone", C.accent) {
+        val ok = Net.postFocus(symbol)     // set the FRESH focus first…
+        if (ok) openOnPhone(ctx)           // …then OPEN the app — a cold open reads the fresh focus and lands on THIS asset; an already-open app switches in place
+        Toast.makeText(ctx, if (ok) "$assetName → opening on phone" else "Couldn't reach the server", Toast.LENGTH_SHORT).show()
     }
 }
 
