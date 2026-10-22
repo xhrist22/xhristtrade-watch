@@ -78,19 +78,20 @@ fun WatchApp() {
             if (rows.isEmpty()) {
                 SplashOrError(error)
             } else {
-                // page 0 = BROKER PICKER · 1 = TRADES · 2..N+1 = assets re-priced to the pick · last = hub. Loops both ways, starts on the picker.
+                // page 0 = BROKER PICKER · 1 = TRADES · 2 = WATCHLIST · 3..N+2 = assets re-priced to the pick · last = hub. Loops both ways.
                 val brokers = rows.firstOrNull()?.brokers ?: emptyList()
-                val real = rows.size + 3
+                val real = rows.size + 4   // 📋 _QT_WATCH_WATCHLIST_PAGE_2026_10_22 — +1 for the watchlist page, right of Trades
                 val pager = rememberPagerState(initialPage = real * 1000, pageCount = { real * 2000 })
                 HorizontalPager(state = pager, modifier = Modifier.fillMaxSize()) { page ->
                     val idx = ((page % real) + real) % real
                     when {
                         idx == 0 -> BrokerPicker(brokers, broker) { broker = it }
                         idx == 1 -> TradesPage(wo, onChanged)
-                        idx <= rows.size + 1 -> {
-                            val r = rows[idx - 2]
+                        idx == 2 -> WatchlistPage(rows, broker)   // 📋 the whole board at a glance, same format as the QT watchlist, in sync
+                        idx <= rows.size + 2 -> {
+                            val r = rows[idx - 3]
                             val basis = if (broker == "Chart") 0.0 else (r.brokers.firstOrNull { it.name == broker }?.basis ?: 0.0)
-                            AssetCard(r, idx - 2, rows.size, broker, basis, wo, onChanged)
+                            AssetCard(r, idx - 3, rows.size, broker, basis, wo, onChanged)
                         }
                         else -> HubPage(rows.size, updatedAt, error)
                     }
@@ -356,6 +357,53 @@ private fun Ema9Line(tf: String, px: Double?, ema9: Double?, pos: Double?) {
         Text("$tf =", color = C.muted, fontSize = 9.sp, fontFamily = MonoNum, modifier = Modifier.width(32.dp))
         Text("$e9$ch", color = if (!known) C.muted else if (above) C.up else C.down,
             fontSize = 9.sp, fontFamily = MonoNum, softWrap = true, modifier = Modifier.weight(1f))
+    }
+}
+
+// 📋 _QT_WATCH_WATCHLIST_PAGE_2026_10_22 — the whole board at a glance, the SAME format as the QT watchlist and in sync (one feed): per asset
+// the ticker (tinted by its signal) + side, the price in the picked broker, and the 1m | 1h LRC candle colour (the exact rgb) with its zone —
+// the identical "1m ● zone | 1h ● zone" the QT watchlist and the asset pages draw. Swipe right from Trades to reach it.
+@Composable
+private fun WatchlistPage(rows: List<Row>, broker: String) {
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 10.dp, vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Spacer(Modifier.height(20.dp))   // clear the TimeText
+        Text("WATCHLIST", color = C.text, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+        Text("in sync with QT · ${rows.size} assets", color = C.muted, fontSize = 9.sp)
+        Spacer(Modifier.height(6.dp))
+        for (r in rows) {
+            WatchlistRow(r, broker)
+            Spacer(Modifier.height(6.dp))
+        }
+        Spacer(Modifier.height(12.dp))
+    }
+}
+
+@Composable
+private fun WatchlistRow(r: Row, broker: String) {
+    val basis = if (broker == "Chart") 0.0 else (r.brokers.firstOrNull { it.name == broker }?.basis ?: 0.0)
+    val px = (r.entry ?: r.ind?.px)?.let { it + basis }
+    Column(Modifier.fillMaxWidth()) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(r.asset, color = callColor(r.signal), fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            Spacer(Modifier.width(4.dp))
+            Text(sideArrow(r.side), color = sideColor(r.side), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.weight(1f))
+            Text(fmtPrice(px), color = C.text, fontFamily = MonoNum, fontSize = 12.sp)
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            r.ind?.let {
+                Text("●", color = rgbColor(it.col, it.hue), fontSize = 9.sp)
+                Text(" 1m ${lrcZone(it.hue, it.pos)}", color = C.muted, fontSize = 9.sp, fontFamily = MonoNum, maxLines = 1)
+            }
+            r.ind1h?.let {
+                Text("  |  ", color = C.muted, fontSize = 9.sp, fontFamily = MonoNum)
+                Text("●", color = rgbColor(it.col, it.hue), fontSize = 9.sp)
+                Text(" 1h ${lrcZone(it.hue, it.pos)}", color = C.muted, fontSize = 9.sp, fontFamily = MonoNum, maxLines = 1)
+            }
+        }
     }
 }
 
