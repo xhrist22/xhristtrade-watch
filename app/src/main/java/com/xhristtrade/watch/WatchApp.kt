@@ -34,6 +34,7 @@ import androidx.wear.compose.material.TimeText
 import androidx.wear.remote.interactions.RemoteActivityHelper
 import com.google.android.gms.wearable.Wearable
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 @Composable
@@ -95,12 +96,22 @@ fun WatchApp() {
                 val brokers = rows.firstOrNull()?.brokers ?: emptyList()
                 val real = rows.size + 4   // 📋 _QT_WATCH_WATCHLIST_PAGE_2026_10_22 — +1 for the watchlist page, right of Trades
                 val pager = rememberPagerState(initialPage = real * 1000, pageCount = { real * 2000 })
+                // 👆 _QT_WATCH_WL_TAP_TO_ASSET_2026_10_23 — tap a watchlist row → jump to THAT asset's page (row i lives at page idx i+3).
+                // Scroll within the CURRENT loop block (currentPage − its idx + i+3) so the move is one short swipe, not across the infinite loop.
+                val navScope = rememberCoroutineScope()
+                val goToAsset: (Int) -> Unit = { i ->
+                    navScope.launch {
+                        val cur = pager.currentPage
+                        val curIdx = ((cur % real) + real) % real
+                        pager.animateScrollToPage(cur - curIdx + (i + 3))
+                    }
+                }
                 HorizontalPager(state = pager, modifier = Modifier.fillMaxSize()) { page ->
                     val idx = ((page % real) + real) % real
                     when {
                         idx == 0 -> BrokerPicker(brokers, broker) { broker = it }
                         idx == 1 -> TradesPage(wo, onChanged)
-                        idx == 2 -> WatchlistPage(rows, broker)   // 📋 the whole board at a glance, same format as the QT watchlist, in sync
+                        idx == 2 -> WatchlistPage(rows, broker, goToAsset)   // 📋 the whole board at a glance, same format as QT; tap a row → its asset page
                         idx <= rows.size + 2 -> {
                             val r = rows[idx - 3]
                             val basis = if (broker == "Chart") 0.0 else (r.brokers.firstOrNull { it.name == broker }?.basis ?: 0.0)
@@ -433,17 +444,17 @@ private fun Banner(text: String, color: Color) {
 // the ticker (tinted by its signal) + side, the price in the picked broker, and the 1m | 1h LRC candle colour (the exact rgb) with its zone —
 // the identical "1m ● zone | 1h ● zone" the QT watchlist and the asset pages draw. Swipe right from Trades to reach it.
 @Composable
-private fun WatchlistPage(rows: List<Row>, broker: String) {
+private fun WatchlistPage(rows: List<Row>, broker: String, onPick: (Int) -> Unit) {
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 10.dp, vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Spacer(Modifier.height(20.dp))   // clear the TimeText
         Text("WATCHLIST", color = C.text, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-        Text("in sync with QT · ${rows.size} assets", color = C.muted, fontSize = 9.sp)
+        Text("in sync with QT · tap an asset to open it", color = C.muted, fontSize = 9.sp)
         Spacer(Modifier.height(6.dp))
-        for (r in rows) {
-            WatchlistRow(r, broker)
+        for ((i, r) in rows.withIndex()) {
+            WatchlistRow(r, broker) { onPick(i) }
             Spacer(Modifier.height(6.dp))
         }
         Spacer(Modifier.height(12.dp))
@@ -451,10 +462,10 @@ private fun WatchlistPage(rows: List<Row>, broker: String) {
 }
 
 @Composable
-private fun WatchlistRow(r: Row, broker: String) {
+private fun WatchlistRow(r: Row, broker: String, onClick: () -> Unit) {
     val basis = if (broker == "Chart") 0.0 else (r.brokers.firstOrNull { it.name == broker }?.basis ?: 0.0)
     val px = (r.entry ?: r.ind?.px)?.let { it + basis }
-    Column(Modifier.fillMaxWidth()) {
+    Column(Modifier.fillMaxWidth().clickable { onClick() }) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(r.asset + if (r.closed) " 🌙" else "", color = callColor(r.signal), fontWeight = FontWeight.Bold, fontSize = 13.sp)
             Spacer(Modifier.width(4.dp))
@@ -486,6 +497,18 @@ private fun WatchlistRow(r: Row, broker: String) {
                     if (!far.isNullOrBlank()) Text("✈️ $far", color = C.explosion, fontSize = 9.sp, fontFamily = MonoNum)
                 }
             }
+        }
+        // 🌊 _QT_WL_WAE_2026_10_23 — the WAE read, same variants + wording as the QT watchlist chip: ✅ active · 🪶 lite · ⏸ pause · 🥊 against
+        // (contradict) · 🟠 fading. Its OWN line under the short / far row — a 3rd item on that row clips on the round face when both show.
+        r.wae?.let { w ->
+            val wc = when (w.mode?.lowercase()) {
+                "active", "firing", "fire" -> C.up
+                "against" -> C.down
+                "lite" -> C.accent
+                "fading", "dying", "spent" -> C.gold
+                else -> C.muted
+            }
+            Text("WAE · ${waeMode(w.mode, w.dying)}", color = wc, fontSize = 9.sp, fontFamily = MonoNum, maxLines = 1)
         }
     }
 }
