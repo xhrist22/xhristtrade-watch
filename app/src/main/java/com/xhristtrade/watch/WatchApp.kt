@@ -237,7 +237,7 @@ private fun HoldToPhoneButton(symbol: String?, assetName: String) {
                     val start = System.currentTimeMillis()
                     val job = scope.launch {
                         while (true) {
-                            prog = ((System.currentTimeMillis() - start) / 5000f).coerceAtMost(1f)
+                            prog = ((System.currentTimeMillis() - start) / 3000f).coerceAtMost(1f)
                             if (prog >= 1f) {
                                 // steer the OPEN phone QT to this asset, in place — no browser, no reload
                                 val ok = Net.postFocus(symbol)
@@ -257,7 +257,7 @@ private fun HoldToPhoneButton(symbol: String?, assetName: String) {
             Box(Modifier.fillMaxWidth(prog).fillMaxHeight().clip(RoundedCornerShape(18.dp)).background(C.accent.copy(alpha = 0.55f)))
         }
         Text(
-            if (prog > 0f) "keep holding… ${(5 - prog * 5).toInt().coerceAtLeast(0)}s" else "📱 hold 5s → $assetName on phone chart",
+            if (prog > 0f) "keep holding… ${(3 - prog * 3).toInt().coerceAtLeast(0)}s" else "📱 hold 3s → $assetName on phone chart",
             color = C.text, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
         )
     }
