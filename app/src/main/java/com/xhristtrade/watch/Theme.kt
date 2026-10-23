@@ -79,7 +79,7 @@ fun lrcSituation(far: String?, hue: String?, pos: Double?): String {
 
 // the WAE desk mode variant with its own emoji (active / lite / pause / against / fading)
 fun waeMode(mode: String?, dying: Boolean?): String = when (mode?.lowercase()) {
-    "active", "firing", "fire" -> "✅ active"
+    "active", "firing", "fire" -> "✔ active"   // 🟥🟩 _QT_WAE_ACTIVE_CHECK_BY_SIDE_2026_10_23 — a monochrome check so the caller can tint it by the WAE side
     "lite" -> "🪶 lite"
     "pause", "paused", "off" -> "⏸ pause"
     "against" -> "🥊 against"
