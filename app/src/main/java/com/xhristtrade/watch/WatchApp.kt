@@ -630,8 +630,8 @@ private fun HeatBar(value: Int?, modifier: Modifier = Modifier) {
 }
 
 private fun heatArrow(trend: String?): String = when (trend) { "heating" -> "↗"; "cooling" -> "↘"; else -> "" }
-// 🕯 the 1m-vs-1h LRC meaning tone → colour (up/ok green · dn red · warn gold · muted grey)
-private fun lrcMeanColor(tone: String?): Color = when (tone) { "up" -> C.up; "dn" -> C.down; "warn" -> C.gold; else -> C.muted }
+// 🕯🎨 the 1m-vs-1h LRC meaning tone → colour by ALIGNMENT (Sam): aligned = green · opposed = red · coiling = yellow (whichever way price goes)
+private fun lrcMeanColor(tone: String?): Color = when (tone) { "aligned" -> C.up; "oppose" -> C.down; "coil" -> C.yellow; else -> C.muted }
 // tone word → colour (both tier words cold/warming/hot/boiling and tag words aligned/spike/pause/building/stirring/simmer/quiet)
 private fun heatToneColor(word: String?): Color = when (word?.lowercase()) {
     "boiling" -> C.down
