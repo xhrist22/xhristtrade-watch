@@ -511,7 +511,8 @@ private fun WatchlistRow(r: Row, broker: String, onClick: () -> Unit) {
         // 🟧 orange (2nd/backup SL) · SL price on the left · RR · ×ATR away on the right. Same stop the QT watchlist + chart + asset page show.
         // 🎨 _QT_WL_STOP_COLOR_2026_10_23 — SL green when it's a paying 🟩 stop (clears the 1.3R threshold), red when not; RR green ≥1.3R, red below; ×ATR muted
         r.stop?.takeIf { !r.closed && it.price != null }?.let { st ->
-            val slCol = if (st.pays) C.up else C.down
+            // 🎨 green = passes the 1.3R threshold (SL + RR green together, same single rule as the QT watchlist); fall back to the paying-stop flag only when RR is missing
+            val slCol = if (st.rr != null) { if (st.rr >= 1.3) C.up else C.down } else { if (st.pays) C.up else C.down }
             WlGrid(
                 left = { Text("${if (st.green) "🟩" else "🟧"} SL ${fmtPrice(st.price?.plus(basis))}", color = slCol, fontSize = 9.sp, fontFamily = MonoNum, maxLines = 1) },
                 right = {
