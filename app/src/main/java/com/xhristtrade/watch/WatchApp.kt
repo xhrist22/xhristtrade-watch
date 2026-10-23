@@ -120,18 +120,18 @@ fun WatchApp() {
             if (rows.isEmpty()) {
                 SplashOrError(error)
             } else {
-                // page 0 = BROKER PICKER · 1 = TRADES · 2 = WATCHLIST · 3..N+2 = assets re-priced to the pick · last = hub. Loops both ways.
+                // page 0 = BROKER PICKER · 1 = TRADES · 2 = 🔥 MARKET HEAT · 3 = WATCHLIST · 4..N+3 = assets re-priced to the pick · last = hub. Loops both ways.
                 val brokers = rows.firstOrNull()?.brokers ?: emptyList()
-                val real = rows.size + 4   // 📋 _QT_WATCH_WATCHLIST_PAGE_2026_10_22 — +1 for the watchlist page, right of Trades
+                val real = rows.size + 5   // 📋 watchlist + 🔥 _QT_WATCH_MARKET_HEAT_PAGE_2026_10_23 (broker · trades · heat · watchlist · hub = 5 non-asset pages)
                 val pager = rememberPagerState(initialPage = real * 1000, pageCount = { real * 2000 })
-                // 👆 _QT_WATCH_WL_TAP_TO_ASSET_2026_10_23 — tap a watchlist row → jump to THAT asset's page (row i lives at page idx i+3).
-                // Scroll within the CURRENT loop block (currentPage − its idx + i+3) so the move is one short swipe, not across the infinite loop.
+                // 👆 _QT_WATCH_WL_TAP_TO_ASSET_2026_10_23 — tap a watchlist/heat row → jump to THAT asset's page (row i lives at page idx i+4 now,
+                // after the 🔥 market-heat page was inserted). Scroll within the CURRENT loop block so the move is one short swipe, not across the loop.
                 val navScope = rememberCoroutineScope()
                 val goToAsset: (Int) -> Unit = { i ->
                     navScope.launch {
                         val cur = pager.currentPage
                         val curIdx = ((cur % real) + real) % real
-                        pager.animateScrollToPage(cur - curIdx + (i + 3))
+                        pager.animateScrollToPage(cur - curIdx + (i + 4))
                     }
                 }
                 HorizontalPager(state = pager, modifier = Modifier.fillMaxSize()) { page ->
@@ -140,11 +140,12 @@ fun WatchApp() {
                     when {
                         idx == 0 -> BrokerPicker(brokers, broker) { broker = it }
                         idx == 1 -> TradesPage(wo, onChanged)
-                        idx == 2 -> WatchlistPage(rows, broker, goToAsset)   // 📋 the whole board at a glance, same format as QT; tap a row → its asset page
-                        idx <= rows.size + 2 -> {
-                            val r = rows[idx - 3]
+                        idx == 2 -> MarketHeatPage(rows, goToAsset)   // 🔥 _QT_WATCH_MARKET_HEAT_PAGE_2026_10_23 — every asset's heat, tap to expand its 1m/1h breakdown
+                        idx == 3 -> WatchlistPage(rows, broker, goToAsset)   // 📋 the whole board at a glance, same format as QT; tap a row → its asset page
+                        idx <= rows.size + 3 -> {
+                            val r = rows[idx - 4]
                             val basis = if (broker == "Chart") 0.0 else (r.brokers.firstOrNull { it.name == broker }?.basis ?: 0.0)
-                            AssetCard(r, idx - 3, rows.size, broker, basis, wo, onChanged)
+                            AssetCard(r, idx - 4, rows.size, broker, basis, wo, onChanged)
                         }
                         else -> HubPage(rows.size, updatedAt, error)
                     }
@@ -765,6 +766,80 @@ private fun HeatPartRow(label: String, v: Int?) {
         HeatBar(v, Modifier.width(58.dp))
         Spacer(Modifier.width(5.dp))
         Text((v ?: 0).toString(), color = C.text, fontSize = 9.sp, fontFamily = MonoNum, textAlign = TextAlign.End, modifier = Modifier.width(22.dp))
+    }
+}
+
+// 🔥 _QT_WATCH_MARKET_HEAT_PAGE_2026_10_23 — Sam: "include a market heat page before watchlist … see all assets heat and expand to see
+// their breakdown for both 1m 1h … auto collapse so i only see each asset respective 1m 1h bar". One scrollable board: every asset with
+// its 1m + 1h temperature bar always visible; tap an asset to expand the 1m & 1h driver breakdown (📊 KURU · 🌋 WAE · 🫧 volume · 📏 move).
+// Hottest (1m) first — a true market-heat ranking. Same heat (lib/heat.js) as QT's heat card and every watch heat surface (r.heat, ONE source).
+@Composable
+private fun MarketHeatPage(rows: List<Row>, goToAsset: (Int) -> Unit) {
+    val scroll = rememberScrollState()
+    Column(
+        Modifier.fillMaxSize().verticalScroll(scroll).bezelScroll(scroll).padding(horizontal = 10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Spacer(Modifier.height(22.dp))   // clear the TimeText
+        Text("🔥 MARKET HEAT", color = C.text, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+        Text("hottest first · tap an asset for its 1m · 1h breakdown", color = C.muted, fontSize = 9.sp, textAlign = TextAlign.Center)
+        Spacer(Modifier.height(6.dp))
+        // hottest 1m heat first (nulls last); navigation uses the ORIGINAL feed index so the asset swipe pages stay put
+        val ordered = rows.withIndex().sortedWith(compareByDescending { it.value.heat?.m?.v ?: -1 })
+        for (iv in ordered) {
+            MarketHeatRow(iv.value) { goToAsset(iv.index) }
+            Spacer(Modifier.height(6.dp))
+        }
+        Spacer(Modifier.height(14.dp))
+    }
+}
+
+// one asset on the heat board: ticker + its tag, the 1m & 1h bars always shown; tap to expand the driver breakdown for BOTH clocks.
+@Composable
+private fun MarketHeatRow(r: Row, onOpen: () -> Unit) {
+    val ht = r.heat
+    var open by remember { mutableStateOf(false) }   // auto-collapsed — only the 1m/1h bars until tapped
+    Column(
+        Modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(C.panel)
+            .border(1.dp, C.border, RoundedCornerShape(10.dp))
+            .clickable { open = !open }
+            .padding(horizontal = 9.dp, vertical = 6.dp),
+    ) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(r.asset + if (r.closed) " 🌙" else "", color = C.text, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.weight(1f))
+            ht?.tagEmoji?.let { e -> Text(e + (ht.tagWord ?: ""), color = heatToneColor(ht.tagWord), fontSize = 9.sp, maxLines = 1); Spacer(Modifier.width(5.dp)) }
+            Text(if (open) "▾" else "▸", color = C.muted, fontSize = 10.sp)
+        }
+        if (ht?.m == null && ht?.h == null) {
+            Text("no heat yet", color = C.muted, fontSize = 9.sp)
+            return@Column
+        }
+        Spacer(Modifier.height(3.dp))
+        HeatTierRow("1m", ht.m)
+        HeatTierRow("1h", ht.h)
+        if (open) {
+            ht.parts?.let { p ->
+                Spacer(Modifier.height(6.dp))
+                Text("1m — what's driving it", color = C.muted, fontSize = 9.sp)
+                HeatPartRow("📊 KURU pressure", p.pressure)
+                HeatPartRow("🌋 WAE energy", p.energy)
+                HeatPartRow("🫧 volume pace", p.volume)
+                HeatPartRow("📏 move size", p.range)
+            }
+            ht.partsH?.let { p ->
+                Spacer(Modifier.height(5.dp))
+                Text("1h — what's driving it", color = C.muted, fontSize = 9.sp)
+                HeatPartRow("📊 KURU pressure", p.pressure)
+                HeatPartRow("🌋 WAE energy", p.energy)
+                HeatPartRow("🫧 volume pace", p.volume)
+                HeatPartRow("📏 move size", p.range)
+            }
+            Spacer(Modifier.height(5.dp))
+            Text("open ${r.asset} →", color = C.accent, fontSize = 9.sp, modifier = Modifier.clickable { onOpen() })
+        }
     }
 }
 
