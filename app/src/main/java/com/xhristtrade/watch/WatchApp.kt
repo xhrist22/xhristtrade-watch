@@ -640,7 +640,7 @@ private fun WaeInline(w: Wae) {
     val active = m == "active" || m == "firing" || m == "fire"
     val wc = when {
         active -> if (w.side?.lowercase() == "sell") C.down else C.up
-        m == "against" -> C.down
+        m == "against" -> C.magenta   // 🥊 _QT_WAE_AGAINST_DISTINCT_2026_10_23 — distinct from the red "active sell" ✔
         m == "lite" -> C.accent
         m == "fading" || m == "dying" || m == "spent" -> C.gold
         else -> C.muted
