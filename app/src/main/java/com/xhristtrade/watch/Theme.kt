@@ -88,6 +88,23 @@ fun waeMode(mode: String?, dying: Boolean?): String = when (mode?.lowercase()) {
     else -> if (dying == true) "🟠 fading" else (mode ?: "—")
 }
 
+// 🎨 _QT_WAE_TAG_COLOR_SYNC_2026_10_23 — Sam: "make sure watch tag color sync". The WAE tag wears the EXACT same colours as the QT chip
+// (ranked.js .wae-st), not the watch's own near-shades: active green #4ade80 / red #f87171 by side · against purple #c084fc · lite cyan
+// #7dd3fc · pause gold #facc15 · fading orange #fb923c. One helper so every watch WAE tag reads identically to QT.
+fun waeTagColor(mode: String?, side: String?, dying: Boolean?): Color {
+    val m = mode?.lowercase()
+    val active = m == "active" || m == "firing" || m == "fire"
+    return when {
+        active && dying == true -> Color(0xFFFB923C)                                                   // fading (QT .firing.dying)
+        active -> if (side?.lowercase() == "sell") Color(0xFFF87171) else Color(0xFF4ADE80)            // QT red / green by side
+        m == "against" -> Color(0xFFC084FC)                                                            // QT purple
+        m == "lite" -> Color(0xFF7DD3FC)                                                               // QT cyan
+        m == "pause" || m == "paused" || m == "off" -> Color(0xFFFACC15)                               // QT gold
+        m == "fading" || m == "dying" || m == "spent" -> Color(0xFFFB923C)                             // QT orange
+        else -> C.muted
+    }
+}
+
 // is EMA9 inside the LRC channel or pushed out past a rail?
 fun ema9Where(upper: Double?, lower: Double?, ema9: Double?): String = when {
     ema9 == null || upper == null || lower == null -> "—"
