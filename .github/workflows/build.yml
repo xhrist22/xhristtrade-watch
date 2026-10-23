@@ -54,7 +54,8 @@ jobs:
         run: ./gradlew :app:assembleDebug --no-daemon --stacktrace
 
       # 🔐 _WATCH_APK_NOT_PUBLIC_2026_10_23 — this repo is PUBLIC and the APK carries the watch key compiled in (BuildConfig), so a
-      # build artifact let any GitHub user download it and pull the key out. The APK goes ONLY to Sam's Telegram DM (next step).
+      # build artifact let any GitHub user download it and pull the key out. The APK is NEVER a public artifact; it goes only to two
+      # PRIVATE channels: Sam's Telegram DM (next step), and — for adb installs — Sam's own VPS over a locked-down deploy key (step after).
 
       - name: DM the APK to Telegram
         if: ${{ success() }}
@@ -68,3 +69,21 @@ jobs:
             -F document=@"$APK" \
             -F caption="⌚ XhristTrade Watch · build #${{ github.run_number }} · install with Wear Installer 2" \
             "https://api.telegram.org/bot${{ secrets.TG_BOT_TOKEN }}/sendDocument?chat_id=${{ secrets.TG_CHAT_ID }}"
+
+      # 🚚 _WATCH_APK_TO_VPS_2026_10_23 — ALSO drop the APK to Sam's PRIVATE VPS so Claude can `adb install` it (GitHub no longer serves it).
+      # VPS_SSH_KEY is a FORCED-COMMAND key: `restrict,command="cat > /root/qt/watch-apk/app-debug.apk"` — it can ONLY overwrite that one
+      # private file (outside the nginx web root), nothing else, even if the secret leaked. This is a private channel, so it honors
+      # _WATCH_APK_NOT_PUBLIC (the APK is never a downloadable artifact). This step does NOT affect the Telegram DM above — both always run.
+      - name: Deliver the APK to the private VPS (for adb installs)
+        if: ${{ success() }}
+        env:
+          KEY: ${{ secrets.VPS_SSH_KEY }}
+          HOST: ${{ secrets.VPS_HOST }}
+          USER: ${{ secrets.VPS_USER }}
+        run: |
+          if [ -z "$KEY" ] || [ -z "$HOST" ] || [ -z "$USER" ]; then echo "VPS secrets not set — skipping VPS drop (Telegram DM still sent)"; exit 0; fi
+          APK=$(find app/build/outputs/apk/debug -name "*.apk" | head -1)
+          if [ -z "$APK" ]; then echo "no apk found"; exit 1; fi
+          printf '%s\n' "$KEY" > dkey && chmod 600 dkey
+          cat "$APK" | ssh -i dkey -o StrictHostKeyChecking=accept-new -o IdentitiesOnly=yes "$USER@$HOST" deliver-apk && echo "APK delivered to private VPS (/root/qt/watch-apk/app-debug.apk)"
+          shred -u dkey 2>/dev/null || rm -f dkey
