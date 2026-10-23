@@ -507,6 +507,19 @@ private fun WatchlistRow(r: Row, broker: String, onClick: () -> Unit) {
             left = { shortN?.let { Text("$it short", color = C.muted, fontSize = 9.sp, fontFamily = MonoNum) } },
             right = { r.far?.takeIf { it.isNotBlank() }?.let { Text("✈️ $it", color = C.explosion, fontSize = 9.sp, fontFamily = MonoNum) } },
         )
+        // 🛑 _QT_WL_STOP_2026_10_23 — the desk stop on one aligned line, in the SELECTED broker's price (basis): 🟩 green (a stop that pays) /
+        // 🟧 orange (2nd/backup SL) · SL price on the left · RR · ×ATR away on the right. Same stop the QT watchlist + chart + asset page show.
+        r.stop?.takeIf { !r.closed && it.price != null }?.let { st ->
+            val col = if (st.green) C.up else C.gold
+            WlGrid(
+                left = { Text("${if (st.green) "🟩" else "🟧"} SL ${fmtPrice(st.price?.plus(basis))}", color = col, fontSize = 9.sp, fontFamily = MonoNum, maxLines = 1) },
+                right = {
+                    val rr = st.rr?.let { "%.2f".format(it) + "R" }
+                    val atr = st.atrAway?.let { "${it.fmt1()}×ATR" }
+                    Text(listOfNotNull(rr, atr).joinToString(" · "), color = C.muted, fontSize = 9.sp, fontFamily = MonoNum, maxLines = 1)
+                },
+            )
+        }
         // 🗓 the option-dealer day type, same tag as the QT watchlist (🏃 trend · ↔️ range · ⚖️ mixed) — its own aligned line
         r.gammaDay?.let { if (dayText(it) != null) WlGrid(left = { DayTag(it) }, right = {}) }
         // 🔥 _QT_HEAT_ON_EVERY_ROW_2026_10_23 — the 1m | 1h market heat with its ↗/↘ trend (same read QT's watchlist shows), one aligned line
