@@ -240,11 +240,9 @@ private fun AssetCard(r: Row, idx: Int, total: Int, brokerName: String, basis: D
             }
             // 🌙 _QT_WATCH_CLOSED_SNAPSHOT_2026_10_22 — when the market is shut, the mode has no live reading (was a bare "mode = —"); say it's
             // the frozen last snapshot instead of a dash. The 🌙 CLOSED banner on top already flags the whole page as a snapshot.
-            // 🟥🟩 _QT_WAE_ACTIVE_CHECK_BY_SIDE_2026_10_23 — the ✔ active mode is tinted by the WAE side (green buy / red sell), same as the row chip
+            // 🎨 _QT_WAE_TAG_COLOR_SYNC_2026_10_23 — the WAE mode row wears the EXACT QT chip colour (shared waeTagColor), in sync with the chip
             PlanRow("mode", if (r.closed) "🌙 last snapshot" else waeMode(w.mode, w.dying),
-                if (r.closed) C.muted
-                else if (w.mode?.lowercase() in listOf("active", "firing", "fire")) (if (w.side?.lowercase() == "sell") C.down else C.up)
-                else C.text)
+                if (r.closed) C.muted else waeTagColor(w.mode, w.side, w.dying))
             // 🗓 _QT_WATCH_GAMMA_DAY_2026_10_23 — below mode, the option-dealer day type (same tag as the QT watchlist): 🏃 trend · ↔️ range · ⚖️ mixed
             r.gammaDay?.let { d -> dayText(d)?.let { PlanRow("day", it, dayColor(d)) } }
             Spacer(Modifier.height(8.dp))
@@ -633,19 +631,10 @@ private fun LegsInline(lit: Int?, legs: Int?) {
 // the WAE read, same variants + wording as the QT chip: ✅ active · 🪶 lite · ⏸ pause · 🥊 against · 🟠 fading, tinted by the mode.
 @Composable
 private fun WaeInline(w: Wae) {
-    // 🟥🟩 _QT_WAE_ACTIVE_CHECK_BY_SIDE_2026_10_23 — Sam: "wae active should have red checkmark if its active red and green for vice
-    // versa". The ✔ active check now follows the WAE's OWN side — green when it is firing a buy / up, red when sell / down (it used to
-    // always be green). The other states keep their own colour. Same read as the QT watchlist chip.
-    val m = w.mode?.lowercase()
-    val active = m == "active" || m == "firing" || m == "fire"
-    val wc = when {
-        active -> if (w.side?.lowercase() == "sell") C.down else C.up
-        m == "against" -> C.magenta   // 🥊 _QT_WAE_AGAINST_DISTINCT_2026_10_23 — distinct from the red "active sell" ✔
-        m == "lite" -> C.accent
-        m == "fading" || m == "dying" || m == "spent" -> C.gold
-        else -> C.muted
-    }
-    Text(waeMode(w.mode, w.dying), color = wc, fontSize = 9.sp, fontFamily = MonoNum, maxLines = 1)
+    // 🎨 _QT_WAE_TAG_COLOR_SYNC_2026_10_23 — the WAE tag wears the EXACT QT chip colours (active grn/red by side · against purple · lite
+    // cyan · pause gold · fading orange), via the shared waeTagColor helper — so the watch tag reads identically to QT. (Supersedes the
+    // earlier _QT_WAE_ACTIVE_CHECK_BY_SIDE / _QT_WAE_AGAINST_DISTINCT near-shades.)
+    Text(waeMode(w.mode, w.dying), color = waeTagColor(w.mode, w.side, w.dying), fontSize = 9.sp, fontFamily = MonoNum, maxLines = 1)
 }
 
 // 🔥 _QT_HEAT_ON_EVERY_ROW_2026_10_23 — the temperature bar, the SAME glass-liquid gradient as QT's heat meter (aqua→green→yellow→orange→
