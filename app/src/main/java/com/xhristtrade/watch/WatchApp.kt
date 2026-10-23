@@ -337,6 +337,9 @@ private fun AssetCard(r: Row, idx: Int, total: Int, brokerName: String, basis: D
         // 🖲 hold 5s → this asset's desk side on the picked broker (signed by the watch's own key) — the very bottom of the card
         Spacer(Modifier.height(8.dp))
         OrderHoldButton(r, brokerName, wo, onChanged)
+        // 🔄 hold 3s → the OPPOSITE of the desk (mean-reversion fade) with the run-origin stop — the watch twin of QT's fade button
+        Spacer(Modifier.height(6.dp))
+        MrHoldButton(r, brokerName, wo, onChanged)
         Spacer(Modifier.height(18.dp))
     }
 }
