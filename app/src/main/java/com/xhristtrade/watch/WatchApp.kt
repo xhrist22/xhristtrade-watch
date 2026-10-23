@@ -240,7 +240,11 @@ private fun AssetCard(r: Row, idx: Int, total: Int, brokerName: String, basis: D
             }
             // 🌙 _QT_WATCH_CLOSED_SNAPSHOT_2026_10_22 — when the market is shut, the mode has no live reading (was a bare "mode = —"); say it's
             // the frozen last snapshot instead of a dash. The 🌙 CLOSED banner on top already flags the whole page as a snapshot.
-            PlanRow("mode", if (r.closed) "🌙 last snapshot" else waeMode(w.mode, w.dying), if (r.closed) C.muted else C.text)
+            // 🟥🟩 _QT_WAE_ACTIVE_CHECK_BY_SIDE_2026_10_23 — the ✔ active mode is tinted by the WAE side (green buy / red sell), same as the row chip
+            PlanRow("mode", if (r.closed) "🌙 last snapshot" else waeMode(w.mode, w.dying),
+                if (r.closed) C.muted
+                else if (w.mode?.lowercase() in listOf("active", "firing", "fire")) (if (w.side?.lowercase() == "sell") C.down else C.up)
+                else C.text)
             // 🗓 _QT_WATCH_GAMMA_DAY_2026_10_23 — below mode, the option-dealer day type (same tag as the QT watchlist): 🏃 trend · ↔️ range · ⚖️ mixed
             r.gammaDay?.let { d -> dayText(d)?.let { PlanRow("day", it, dayColor(d)) } }
             Spacer(Modifier.height(8.dp))
@@ -629,11 +633,16 @@ private fun LegsInline(lit: Int?, legs: Int?) {
 // the WAE read, same variants + wording as the QT chip: ✅ active · 🪶 lite · ⏸ pause · 🥊 against · 🟠 fading, tinted by the mode.
 @Composable
 private fun WaeInline(w: Wae) {
-    val wc = when (w.mode?.lowercase()) {
-        "active", "firing", "fire" -> C.up
-        "against" -> C.down
-        "lite" -> C.accent
-        "fading", "dying", "spent" -> C.gold
+    // 🟥🟩 _QT_WAE_ACTIVE_CHECK_BY_SIDE_2026_10_23 — Sam: "wae active should have red checkmark if its active red and green for vice
+    // versa". The ✔ active check now follows the WAE's OWN side — green when it is firing a buy / up, red when sell / down (it used to
+    // always be green). The other states keep their own colour. Same read as the QT watchlist chip.
+    val m = w.mode?.lowercase()
+    val active = m == "active" || m == "firing" || m == "fire"
+    val wc = when {
+        active -> if (w.side?.lowercase() == "sell") C.down else C.up
+        m == "against" -> C.down
+        m == "lite" -> C.accent
+        m == "fading" || m == "dying" || m == "spent" -> C.gold
         else -> C.muted
     }
     Text(waeMode(w.mode, w.dying), color = wc, fontSize = 9.sp, fontFamily = MonoNum, maxLines = 1)
