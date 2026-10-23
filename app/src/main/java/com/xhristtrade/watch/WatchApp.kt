@@ -376,10 +376,11 @@ private fun SignalCard(r: Row) {
 }
 
 // 🤝 _QT_KURU_WAE_VERDICT_2026_10_23 — the KURU + WAE verdict exactly as the QT chart banner reads it: 📊 KURU (pressure) first, 🌋 WAE
-// (energy), then → price. Tinted + bordered by tone (up/ok green · dn red · warn gold · dead muted). Same words as the chart (shared kuruwae.js).
+// (energy), then → price. Tone colours MATCH the chart banner (.pb-rel) + the QT watchlist (.wl-kw) exactly, so all three surfaces agree:
+// up = green breakout · dn = red · ok = cyan (mild agreement, NOT a breakout — distinct from up) · warn = gold · dead = muted. Same words (shared kuruwae.js).
 @Composable
 private fun KwVerdictCard(kv: KwVerdict) {
-    val col = when (kv.tone) { "up", "ok" -> C.up; "dn" -> C.down; "warn" -> C.gold; else -> C.muted }
+    val col = when (kv.tone) { "up" -> C.up; "dn" -> C.down; "ok" -> C.aqua; "warn" -> C.gold; else -> C.muted }
     Column(
         Modifier.fillMaxWidth()
             .clip(RoundedCornerShape(8.dp))
