@@ -786,8 +786,12 @@ private fun MarketHeatPage(rows: List<Row>, goToAsset: (Int) -> Unit) {
         Text("hottest 1h first · tap an asset for its 1m · 1h breakdown", color = C.muted, fontSize = 9.sp, textAlign = TextAlign.Center)
         Spacer(Modifier.height(6.dp))
         // 🔥 _QT_WATCH_HEAT_RANK_1H_2026_10_23 — Sam: "make the watch ranking always be default stuck to the 1h ranking for market heat".
-        // Hottest 1h heat first (nulls last); navigation uses the ORIGINAL feed index so the asset swipe pages stay put.
-        val ordered = rows.withIndex().sortedWith(compareByDescending { it.value.heat?.h?.v ?: -1 })
+        // 🧊 _QT_FROZEN_NEVER_RANKS_2026_10_23 — Sam: "market heat only count btc and eth when all other assets are closed". A shut market
+        // still shows its last snapshot but sorts to the BOTTOM, never above a live one — so on a weekend BTC/ETH stand alone on top.
+        // Hottest 1h heat first among the OPEN markets (closed last, nulls last); navigation uses the ORIGINAL feed index so pages stay put.
+        val ordered = rows.withIndex().sortedWith(
+            compareBy<IndexedValue<Row>> { if (it.value.closed) 1 else 0 }
+                .thenByDescending { it.value.heat?.h?.v ?: -1 })
         for (iv in ordered) {
             MarketHeatRow(iv.value) { goToAsset(iv.index) }
             Spacer(Modifier.height(6.dp))
