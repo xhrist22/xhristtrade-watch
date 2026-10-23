@@ -222,6 +222,34 @@ fun OrderHoldButton(r: Row, broker: String, wo: WoUi, onChanged: () -> Unit) {
     res?.let { Text(it, color = C.muted, fontSize = 9.sp, textAlign = TextAlign.Center) }
 }
 
+// 🔄 _QT_MEAN_REVERSION_ORDER_2026_10_23 — the watch FADE button: take the OPPOSITE of the desk side with the run-origin stop (the server
+// computes both). A deliberate 3-second hold, purple (the counter colour), 0.5 % and the bot trails it — the watch twin of QT's 🔄 button.
+@Composable
+fun MrHoldButton(r: Row, broker: String, wo: WoUi, onChanged: () -> Unit) {
+    val deskSide = r.side?.uppercase()
+    val fade = if (deskSide == "BUY") "SELL" else if (deskSide == "SELL") "BUY" else null
+    val acct = wo.feed?.roster?.firstOrNull { it.name == broker }
+    val why = when {
+        wo.paired != true -> "🔐 pair the watch on the Trades page"
+        broker == "Chart" -> "🏦 pick a broker on page 1 to fade"
+        acct == null -> "🏦 $broker isn't on the account list"
+        fade == null -> "no desk side to fade"
+        wo.feed?.off == true -> "⛔ watch orders are OFF"
+        else -> null
+    }
+    var res by remember(r.asset, broker) { mutableStateOf<String?>(null) }
+    val label = if (why != null) why else "🔄 hold 3s → fade $fade ${r.asset}" + if (acct?.mode == "watch") " (ticket)" else ""
+    HoldBar(3, label, Color(0xFFC084FC), enabled = why == null) {
+        res = when (val x = Orders.signed("order", mapOf("asset" to r.asset, "side" to fade, "inst" to acct!!.inst, "broker" to acct.name, "mode" to "mr"))) {
+            is WoResult.Ok -> describeOrder(x.json, acct.name)
+            is WoResult.Err -> "❌ ${x.why}"
+            is WoResult.Unpaired -> "🔐 ${x.why}"
+        }
+        onChanged()
+    }
+    res?.let { Text(it, color = C.muted, fontSize = 9.sp, textAlign = TextAlign.Center) }
+}
+
 // what the server answered, in this broker's own prices
 private fun describeOrder(j: org.json.JSONObject, name: String): String {
     j.optJSONObject("ticket")?.let { t ->   // 👁 watch-only account: the hand ticket to type into MT5
