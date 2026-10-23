@@ -808,6 +808,9 @@ private fun MarketHeatRow(r: Row, onOpen: () -> Unit) {
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(r.asset + if (r.closed) " 🌙" else "", color = C.text, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            // 🧭 _QT_HEAT_SIDE_2026_10_23 — Sam: "include buy sell position on market … on watch as well organized and align". The desk's
+            // BUY/SELL side next to the ticker, ▲ green / ▼ red (exact QT hexes), so the watch board matches the QT heat card.
+            r.side?.uppercase()?.let { s -> if (s == "BUY" || s == "SELL") { Spacer(Modifier.width(5.dp)); Text(if (s == "BUY") "▲ BUY" else "▼ SELL", color = if (s == "BUY") Color(0xFF4ADE80) else Color(0xFFF87171), fontSize = 9.sp, fontWeight = FontWeight.Bold) } }
             Spacer(Modifier.weight(1f))
             ht?.tagEmoji?.let { e -> Text(e + (ht.tagWord ?: ""), color = heatToneColor(ht.tagWord), fontSize = 9.sp, maxLines = 1); Spacer(Modifier.width(5.dp)) }
             Text(if (open) "▾" else "▸", color = C.muted, fontSize = 10.sp)
