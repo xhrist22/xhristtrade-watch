@@ -73,6 +73,7 @@ data class Row(
     val lit: Int?,
     val legs: Int?,
     val rank: Int?,                // 🗂 the QT watchlist's "closest to setup first" position (desk lrc_order) — the watchlist sorts by it
+    val gammaDay: String?,         // 🗓 option-dealer day type: "trend" (moves extend) / "range" (moves fade) / "mixed" — same as the QT chip
     val reason: String?,
     val far: String?,              // "↑0.33× ATR" — how far it already went (the ✈️ stretched distance)
     val signal: String?,           // "green" / "red" / …
@@ -210,6 +211,7 @@ fun parseFeed(body: String): Feed {
                 lit = o.intn("lit"),
                 legs = o.intn("legs"),
                 rank = o.intn("rank"),
+                gammaDay = o.strn("gamma_day"),
                 reason = o.strn("reason"),
                 far = o.strn("far"),
                 signal = o.strn("signal"),
