@@ -176,10 +176,10 @@ private fun AssetCard(r: Row, idx: Int, total: Int, brokerName: String, basis: D
                 fontWeight = FontWeight.SemiBold)
         }
 
-        // legs meter
+        // legs meter — the SAME blue bar as the watchlist (ticks + lit/legs count), not the plain "5/7 legs" text
         if (r.legs != null && r.lit != null) {
             Spacer(Modifier.height(3.dp))
-            Text("${r.lit}/${r.legs} legs lit", color = C.muted, fontSize = 10.sp)
+            Row(verticalAlignment = Alignment.CenterVertically) { LegsInline(r.lit, r.legs) }
         }
 
         Spacer(Modifier.height(8.dp))
@@ -204,6 +204,8 @@ private fun AssetCard(r: Row, idx: Int, total: Int, brokerName: String, basis: D
             // 🌙 _QT_WATCH_CLOSED_SNAPSHOT_2026_10_22 — when the market is shut, the mode has no live reading (was a bare "mode = —"); say it's
             // the frozen last snapshot instead of a dash. The 🌙 CLOSED banner on top already flags the whole page as a snapshot.
             PlanRow("mode", if (r.closed) "🌙 last snapshot" else waeMode(w.mode, w.dying), if (r.closed) C.muted else C.text)
+            // 🗓 _QT_WATCH_GAMMA_DAY_2026_10_23 — below mode, the option-dealer day type (same tag as the QT watchlist): 🏃 trend · ↔️ range · ⚖️ mixed
+            r.gammaDay?.let { d -> dayText(d)?.let { PlanRow("day", it, dayColor(d)) } }
             Spacer(Modifier.height(8.dp))
         }
 
@@ -494,8 +496,19 @@ private fun WatchlistRow(r: Row, broker: String, onClick: () -> Unit) {
             left = { shortN?.let { Text("$it short", color = C.muted, fontSize = 9.sp, fontFamily = MonoNum) } },
             right = { r.far?.takeIf { it.isNotBlank() }?.let { Text("✈️ $it", color = C.explosion, fontSize = 9.sp, fontFamily = MonoNum) } },
         )
+        // 🗓 the option-dealer day type, same tag as the QT watchlist (🏃 trend · ↔️ range · ⚖️ mixed) — its own aligned line
+        r.gammaDay?.let { if (dayText(it) != null) WlGrid(left = { DayTag(it) }, right = {}) }
     }
 }
+
+// 🗓 the option-dealer day type, same words + icons as the QT chip. 🏃 trend day (moves extend) · ↔️ range day (moves fade) · ⚖️ mixed (too close to the flip to tell).
+@Composable
+private fun DayTag(day: String?) {
+    val txt = dayText(day) ?: return
+    Text(txt, color = dayColor(day), fontSize = 9.sp, fontFamily = MonoNum, maxLines = 1)
+}
+private fun dayText(day: String?): String? = when (day) { "trend" -> "🏃 Trend day"; "range" -> "↔️ Range day"; "mixed" -> "⚖️ Mixed"; else -> null }
+private fun dayColor(day: String?): Color = when (day) { "trend" -> C.up; "range" -> C.gold; else -> C.muted }
 
 // 📊 one aligned two-column line of the watchlist row — the left and right halves each take exactly half so the columns line up down the list.
 @Composable
