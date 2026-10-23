@@ -243,6 +243,11 @@ private fun AssetCard(r: Row, idx: Int, total: Int, brokerName: String, basis: D
                     Text("▁ ${fmtPrice(sp(ind.lower))}", color = C.muted, fontFamily = MonoNum, fontSize = 9.sp)
                 }
             }
+            // 🕯 _QT_LRC_1M_1H_MEAN_2026_10_23 — below the 1m | 1h colours: what the same/different colour means for the move (current candles), same read as QT
+            r.lrcMean?.text?.let { txt ->
+                Spacer(Modifier.height(5.dp))
+                Text(txt, color = lrcMeanColor(r.lrcMean.tone), fontSize = 10.sp, softWrap = true, modifier = Modifier.fillMaxWidth())
+            }
             Spacer(Modifier.height(8.dp))
         }
 
@@ -625,6 +630,8 @@ private fun HeatBar(value: Int?, modifier: Modifier = Modifier) {
 }
 
 private fun heatArrow(trend: String?): String = when (trend) { "heating" -> "↗"; "cooling" -> "↘"; else -> "" }
+// 🕯 the 1m-vs-1h LRC meaning tone → colour (up/ok green · dn red · warn gold · muted grey)
+private fun lrcMeanColor(tone: String?): Color = when (tone) { "up" -> C.up; "dn" -> C.down; "warn" -> C.gold; else -> C.muted }
 // tone word → colour (both tier words cold/warming/hot/boiling and tag words aligned/spike/pause/building/stirring/simmer/quiet)
 private fun heatToneColor(word: String?): Color = when (word?.lowercase()) {
     "boiling" -> C.down
