@@ -73,6 +73,10 @@ data class Heat(
     val frozen: Boolean,
 )
 
+// 🤝 _QT_KURU_WAE_VERDICT_2026_10_23 — the SAME KURU + WAE "→ price …" verdict the QT chart banner shows (kuruwae.js kuruWaeVerdict):
+// KURU (pressure) first, then WAE (energy), then what the two mean for price, with a tone (up/dn/warn/ok/dead) for colour.
+data class KwVerdict(val kuru: String?, val wae: String?, val price: String?, val head: String?, val tone: String?)
+
 data class Row(
     val asset: String,
     val symbol: String?,
@@ -105,6 +109,7 @@ data class Row(
     val tape: Tape?,               // 🎞 the 1h tape (who hit harder) + plain means
     val event: Ev?,                // 📅 next imminent econ event
     val heat: Heat?,               // 🔥 the 1m/1h market heat + synergy tag + driver parts (= QT heat)
+    val kw: KwVerdict?,            // 🤝 the KURU + WAE "→ price …" verdict (= the QT chart banner)
 )
 
 // a broker/account you can price the board in — name, its gap vs the chart on THIS asset (null = never measured), its mode
@@ -210,6 +215,8 @@ fun parseFeed(body: String): Feed {
         val tape = if (tpO == null) null else Tape(buy = tpO.intn("buy"), sell = tpO.intn("sell"), means = tpO.strn("means"))
         val evO = o.objn("event")
         val event = if (evO == null) null else Ev(title = evO.strn("title"), mins = evO.intn("mins"), impact = evO.strn("impact"))
+        val kwO = o.objn("kw")
+        val kw = if (kwO == null) null else KwVerdict(kwO.strn("kuru"), kwO.strn("wae"), kwO.strn("price"), kwO.strn("head"), kwO.strn("tone"))
         val htO = o.objn("heat")
         val heat = if (htO == null) null else {
             fun tier(k: String): HeatTier? { val t = htO.objn(k) ?: return null; return HeatTier(t.intn("v"), t.strn("word"), t.strn("trend"), t.intn("rank"), t.strn("icon")) }
@@ -259,6 +266,7 @@ fun parseFeed(body: String): Feed {
                 tape = tape,
                 event = event,
                 heat = heat,
+                kw = kw,
             )
         )
     }

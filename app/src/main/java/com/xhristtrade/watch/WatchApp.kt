@@ -205,6 +205,11 @@ private fun AssetCard(r: Row, idx: Int, total: Int, brokerName: String, basis: D
         r.wae?.let { w ->
             SectionLabel("WAE · ${w.side ?: "—"}${if (w.firing) " · firing" else ""}")
             WaeChart(w, Modifier.fillMaxWidth().height(40.dp))
+            // 🤝 _QT_KURU_WAE_VERDICT_2026_10_23 — directly below the WAE graph: the SAME KURU + WAE "→ price …" verdict the QT chart banner shows
+            r.kw?.let { kv ->
+                Spacer(Modifier.height(5.dp))
+                KwVerdictCard(kv)
+            }
             // 🌙 _QT_WATCH_CLOSED_SNAPSHOT_2026_10_22 — when the market is shut, the mode has no live reading (was a bare "mode = —"); say it's
             // the frozen last snapshot instead of a dash. The 🌙 CLOSED banner on top already flags the whole page as a snapshot.
             PlanRow("mode", if (r.closed) "🌙 last snapshot" else waeMode(w.mode, w.dying), if (r.closed) C.muted else C.text)
@@ -334,6 +339,27 @@ private fun SignalCard(r: Row) {
         } else reasons.forEach {
             Spacer(Modifier.height(3.dp))
             Text("• $it", color = C.text, fontSize = 10.sp, softWrap = true)
+        }
+    }
+}
+
+// 🤝 _QT_KURU_WAE_VERDICT_2026_10_23 — the KURU + WAE verdict exactly as the QT chart banner reads it: 📊 KURU (pressure) first, 🌋 WAE
+// (energy), then → price. Tinted + bordered by tone (up/ok green · dn red · warn gold · dead muted). Same words as the chart (shared kuruwae.js).
+@Composable
+private fun KwVerdictCard(kv: KwVerdict) {
+    val col = when (kv.tone) { "up", "ok" -> C.up; "dn" -> C.down; "warn" -> C.gold; else -> C.muted }
+    Column(
+        Modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(C.panel)
+            .border(1.dp, col.copy(alpha = 0.6f), RoundedCornerShape(8.dp))
+            .padding(horizontal = 9.dp, vertical = 6.dp),
+    ) {
+        kv.kuru?.let { Text("📊 KURU $it", color = C.text, fontSize = 10.sp, softWrap = true) }
+        kv.wae?.let { Text("🌋 WAE $it", color = C.text, fontSize = 10.sp, softWrap = true) }
+        kv.price?.let {
+            Spacer(Modifier.height(2.dp))
+            Text("→ price $it", color = col, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, softWrap = true)
         }
     }
 }
