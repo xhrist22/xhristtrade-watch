@@ -19,6 +19,7 @@ object C {
     val yellow = Color(0xFFD4A514)
     val aqua = Color(0xFF26C6DA)
     val explosion = Color(0xFFE5B80B) // WAE explosion line (yellow/gold)
+    val magenta = Color(0xFFC084FC)   // 🥊 _QT_WAE_AGAINST_DISTINCT_2026_10_23 — WAE "against", distinct from the red "active sell"
     val deadzone = Color(0xFF42A5F5)  // WAE dead-zone line (blue)
     // LRC channel zones — the EXACT palette QT's heat meter + desk use (aqua top → red bottom)
     val lrcAqua = Color(0xFF00BCD4)
