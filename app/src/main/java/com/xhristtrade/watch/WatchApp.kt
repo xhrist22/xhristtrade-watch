@@ -512,7 +512,7 @@ private fun WatchlistRow(r: Row, broker: String, onClick: () -> Unit) {
         // 🔥 _QT_HEAT_ON_EVERY_ROW_2026_10_23 — the 1m | 1h market heat with its ↗/↘ trend (same read QT's watchlist shows), one aligned line
         r.heat?.let { ht ->
             if (ht.m != null || ht.h != null) WlGrid(
-                left = { Text("🔥", color = C.explosion, fontSize = 9.sp); HeatInline("1m", ht.m) },
+                left = { HeatInline("1m", ht.m) },
                 right = { HeatInline("1h", ht.h) },
             )
         }
@@ -623,7 +623,7 @@ private fun HeatSection(ht: Heat) {
     ) {
         // header — always visible: 🔥 HEAT … tag … ▸/▾
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text("🔥 HEAT", color = C.text, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            Text("HEAT", color = C.text, fontSize = 11.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.weight(1f))
             ht.tagEmoji?.let { e -> Text(e + (ht.tagWord ?: ""), color = heatToneColor(ht.tagWord), fontSize = 9.sp, maxLines = 1) }
             Spacer(Modifier.width(5.dp))
