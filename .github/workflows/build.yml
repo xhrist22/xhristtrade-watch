@@ -53,13 +53,8 @@ jobs:
           PHONE_URL: ${{ secrets.QT_PHONE_URL }}
         run: ./gradlew :app:assembleDebug --no-daemon --stacktrace
 
-      - name: Upload APK as a build artifact
-        if: ${{ always() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: xhristtrade-watch-apk
-          path: app/build/outputs/apk/debug/*.apk
-          if-no-files-found: ignore
+      # 🔐 _WATCH_APK_NOT_PUBLIC_2026_10_23 — this repo is PUBLIC and the APK carries the watch key compiled in (BuildConfig), so a
+      # build artifact let any GitHub user download it and pull the key out. The APK goes ONLY to Sam's Telegram DM (next step).
 
       - name: DM the APK to Telegram
         if: ${{ success() }}
