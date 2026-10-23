@@ -836,9 +836,10 @@ private fun sideArrow(side: String?): String = when (side?.uppercase()) {
 private fun callColor(signal: String?): Color = when (signal?.lowercase()) {
     "green" -> C.up; "red" -> C.down; "yellow", "gold" -> C.gold; else -> C.muted
 }
-private fun rrColor(rr: Double): Color = when {
-    rr >= 2.0 -> C.up; rr >= 1.3 -> C.gold; else -> C.down
-}
+// 🎨 _QT_BUTTON_RR_COLOR_2026_10_23 — Sam: "red and green is passes threshold … apply accordingly to watch". Every R on the watch now reads
+// GREEN when it clears the 1.3R desk threshold, RED below — the SAME binary rule as the QT button, watchlist SL/RR and the chart's box R.
+// (Was 3-tier green/gold/red, which showed the same R green in the stop line but gold in the plan row — now consistent everywhere.)
+private fun rrColor(rr: Double): Color = if (rr >= 1.3) C.up else C.down
 private fun dots(idx: Int, total: Int): String {
     val sb = StringBuilder()
     for (i in 0 until total) sb.append(if (i == idx) "●" else "·")
