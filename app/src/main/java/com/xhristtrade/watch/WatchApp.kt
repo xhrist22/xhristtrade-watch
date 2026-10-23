@@ -3,6 +3,7 @@ package com.xhristtrade.watch
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -16,6 +17,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -280,6 +284,13 @@ private fun AssetCard(r: Row, idx: Int, total: Int, brokerName: String, basis: D
         Spacer(Modifier.height(12.dp))
         SignalCard(r)
 
+        // 🔥 _QT_WATCH_HEAT_SECTION_2026_10_23 — the market-heat breakdown, auto-collapsed, right above the open-on-phone button: 1m + 1h
+        // heat with the ↗/↘ trend, the 1m×1h synergy tag, and (when opened) the four driver bars on both clocks — the SAME QT heat card read.
+        r.heat?.let {
+            Spacer(Modifier.height(10.dp))
+            HeatSection(it)
+        }
+
         // 📱 hold 3s → open THIS asset on the phone's QT
         Spacer(Modifier.height(10.dp))
         HoldToPhoneButton(r.symbol, r.asset)
@@ -498,6 +509,13 @@ private fun WatchlistRow(r: Row, broker: String, onClick: () -> Unit) {
         )
         // 🗓 the option-dealer day type, same tag as the QT watchlist (🏃 trend · ↔️ range · ⚖️ mixed) — its own aligned line
         r.gammaDay?.let { if (dayText(it) != null) WlGrid(left = { DayTag(it) }, right = {}) }
+        // 🔥 _QT_HEAT_ON_EVERY_ROW_2026_10_23 — the 1m | 1h market heat with its ↗/↘ trend (same read QT's watchlist shows), one aligned line
+        r.heat?.let { ht ->
+            if (ht.m != null || ht.h != null) WlGrid(
+                left = { Text("🔥", color = C.explosion, fontSize = 9.sp); HeatInline("1m", ht.m) },
+                right = { HeatInline("1h", ht.h) },
+            )
+        }
     }
 }
 
@@ -543,6 +561,132 @@ private fun WaeInline(w: Wae) {
         else -> C.muted
     }
     Text(waeMode(w.mode, w.dying), color = wc, fontSize = 9.sp, fontFamily = MonoNum, maxLines = 1)
+}
+
+// 🔥 _QT_HEAT_ON_EVERY_ROW_2026_10_23 — the temperature bar, the SAME glass-liquid gradient as QT's heat meter (aqua→green→yellow→orange→
+// red): the fill reaches the 0-100 value and the colour AT THE TIP is how hot it is — the identical scale on every bar, over a thin track.
+@Composable
+private fun HeatBar(value: Int?, modifier: Modifier = Modifier) {
+    val v = (value ?: 0).coerceIn(0, 100)
+    Canvas(modifier.height(6.dp)) {
+        val w = size.width; val h = size.height; val r = CornerRadius(h / 2f, h / 2f)
+        drawRoundRect(color = C.border, cornerRadius = r)
+        if (v > 0 && w > 0f) {
+            val fw = (w * v / 100f).coerceAtLeast(h)
+            drawRoundRect(
+                brush = Brush.horizontalGradient(
+                    listOf(Color(0xFF22D3EE), Color(0xFF34D399), Color(0xFFFACC15), Color(0xFFFB923C), Color(0xFFEF4444)),
+                    startX = 0f, endX = w,
+                ),
+                size = Size(fw, h), cornerRadius = r,
+            )
+        }
+    }
+}
+
+private fun heatArrow(trend: String?): String = when (trend) { "heating" -> "↗"; "cooling" -> "↘"; else -> "" }
+// tone word → colour (both tier words cold/warming/hot/boiling and tag words aligned/spike/pause/building/stirring/simmer/quiet)
+private fun heatToneColor(word: String?): Color = when (word?.lowercase()) {
+    "boiling" -> C.down
+    "hot", "aligned", "spike" -> C.lrcOrange
+    "warming", "building", "stirring", "simmer", "pause" -> C.gold
+    else -> C.muted
+}
+
+// one compact "1m [bar] 78↗" cell — used on the watchlist row + the collapsed heat header
+@Composable
+private fun HeatInline(tf: String, t: HeatTier?) {
+    Text(tf, color = C.muted, fontSize = 9.sp, fontFamily = MonoNum)
+    Spacer(Modifier.width(3.dp))
+    if (t?.v == null) { Text("·", color = C.muted, fontSize = 9.sp); return }
+    HeatBar(t.v, Modifier.width(22.dp))
+    Spacer(Modifier.width(3.dp))
+    Text("${t.v}${heatArrow(t.trend)}", color = C.text, fontSize = 9.sp, fontFamily = MonoNum, maxLines = 1)
+}
+
+// 🔥 _QT_WATCH_HEAT_SECTION_2026_10_23 — Sam: "above hold for 3 second to open app make the 1h 1m auto collapsed section … 1m 1h kuru
+// pressure wae energy volume pace move size temperature colored bar graphic just like qt heat". Auto-collapsed (tap to open) — the SAME
+// market heat (lib/heat.js) as QT's heat card: 1m + 1h heat with the ↗/↘ trend, the 1m×1h synergy tag, and the four driver bars
+// (📊 KURU pressure · 🌋 WAE energy · 🫧 volume pace · 📏 move size) on both clocks, each a temperature-coloured liquid bar.
+@Composable
+private fun HeatSection(ht: Heat) {
+    if (ht.m == null && ht.h == null) return
+    var open by remember { mutableStateOf(false) }
+    Column(
+        Modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(C.panel)
+            .border(1.dp, C.border, RoundedCornerShape(10.dp))
+            .clickable { open = !open }
+            .padding(horizontal = 10.dp, vertical = 7.dp),
+    ) {
+        // header — always visible: 🔥 HEAT … tag … ▸/▾
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("🔥 HEAT", color = C.text, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.weight(1f))
+            ht.tagEmoji?.let { e -> Text(e + (ht.tagWord ?: ""), color = heatToneColor(ht.tagWord), fontSize = 9.sp, maxLines = 1) }
+            Spacer(Modifier.width(5.dp))
+            Text(if (open) "▾" else "▸", color = C.muted, fontSize = 10.sp)
+        }
+        if (!open) {
+            Spacer(Modifier.height(4.dp))
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                HeatInline("1m", ht.m)
+                Spacer(Modifier.width(12.dp))
+                HeatInline("1h", ht.h)
+            }
+        } else {
+            Spacer(Modifier.height(6.dp))
+            HeatTierRow("1m", ht.m)
+            HeatTierRow("1h", ht.h)
+            ht.tagEmoji?.let { e ->
+                Spacer(Modifier.height(4.dp))
+                Text("$e ${ht.tagWord ?: ""}", color = heatToneColor(ht.tagWord), fontSize = 10.sp, maxLines = 1)
+            }
+            ht.parts?.let { p ->
+                Spacer(Modifier.height(7.dp))
+                Text("1m — what's driving it", color = C.muted, fontSize = 9.sp)
+                HeatPartRow("📊 KURU pressure", p.pressure)
+                HeatPartRow("🌋 WAE energy", p.energy)
+                HeatPartRow("🫧 volume pace", p.volume)
+                HeatPartRow("📏 move size", p.range)
+            }
+            ht.partsH?.let { p ->
+                Spacer(Modifier.height(6.dp))
+                Text("1h — what's driving it", color = C.muted, fontSize = 9.sp)
+                HeatPartRow("📊 KURU pressure", p.pressure)
+                HeatPartRow("🌋 WAE energy", p.energy)
+                HeatPartRow("🫧 volume pace", p.volume)
+                HeatPartRow("📏 move size", p.range)
+            }
+        }
+    }
+}
+
+// one "1m [=====] 78↗ hot" line — the heat on one clock with its trend + word
+@Composable
+private fun HeatTierRow(tf: String, t: HeatTier?) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 1.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(tf, color = C.muted, fontSize = 10.sp, fontFamily = MonoNum, textAlign = TextAlign.End, modifier = Modifier.width(20.dp))
+        Spacer(Modifier.width(6.dp))
+        if (t?.v == null) { Text("—", color = C.muted, fontSize = 10.sp); return@Row }
+        HeatBar(t.v, Modifier.weight(1f))
+        Spacer(Modifier.width(6.dp))
+        Text("${t.v}${heatArrow(t.trend)}", color = C.text, fontSize = 10.sp, fontFamily = MonoNum, maxLines = 1, modifier = Modifier.width(34.dp))
+        t.word?.let { Text(it, color = heatToneColor(it), fontSize = 9.sp, maxLines = 1) }
+    }
+}
+
+// one driver bar — "📊 KURU pressure [=====] 71" — the component graded 0-100 vs this asset's own day
+@Composable
+private fun HeatPartRow(label: String, v: Int?) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 1.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(label, color = C.muted, fontSize = 9.sp, maxLines = 1, modifier = Modifier.weight(1f))
+        Spacer(Modifier.width(6.dp))
+        HeatBar(v, Modifier.width(58.dp))
+        Spacer(Modifier.width(5.dp))
+        Text((v ?: 0).toString(), color = C.text, fontSize = 9.sp, fontFamily = MonoNum, textAlign = TextAlign.End, modifier = Modifier.width(22.dp))
+    }
 }
 
 @Composable

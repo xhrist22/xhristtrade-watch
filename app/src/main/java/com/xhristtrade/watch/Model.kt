@@ -62,6 +62,17 @@ data class Tape(val buy: Int?, val sell: Int?, val means: String?)
 // 📅 the next imminent econ event for this asset (the desk's own calendar) — minutes out + impact, for the watch's event banner
 data class Ev(val title: String?, val mins: Int?, val impact: String?)
 
+// 🔥 _QT_HEAT_ON_EVERY_ROW_2026_10_23 — the market heat (lib/heat.js) folded onto the row, the SAME read QT's heat chip/card show:
+// each clock (1m, 1h) its value/word/trend, the 1m×1h synergy tag (its word + emoji), and the four driver parts graded 0-100.
+data class HeatTier(val v: Int?, val word: String?, val trend: String?, val rank: Int?)   // trend: "heating" ↗ / "cooling" ↘ / "steady"
+data class HeatParts(val pressure: Int?, val energy: Int?, val volume: Int?, val range: Int?)   // KURU pressure · WAE energy · volume pace · move size
+data class Heat(
+    val m: HeatTier?, val h: HeatTier?,
+    val tagWord: String?, val tagEmoji: String?,
+    val parts: HeatParts?, val partsH: HeatParts?,
+    val frozen: Boolean,
+)
+
 data class Row(
     val asset: String,
     val symbol: String?,
@@ -93,6 +104,7 @@ data class Row(
     val brokers: List<Broker>,     // every account incl. the 2 FTMO, each with its gap on this asset (watch-only field)
     val tape: Tape?,               // 🎞 the 1h tape (who hit harder) + plain means
     val event: Ev?,                // 📅 next imminent econ event
+    val heat: Heat?,               // 🔥 the 1m/1h market heat + synergy tag + driver parts (= QT heat)
 )
 
 // a broker/account you can price the board in — name, its gap vs the chart on THIS asset (null = never measured), its mode
@@ -198,6 +210,13 @@ fun parseFeed(body: String): Feed {
         val tape = if (tpO == null) null else Tape(buy = tpO.intn("buy"), sell = tpO.intn("sell"), means = tpO.strn("means"))
         val evO = o.objn("event")
         val event = if (evO == null) null else Ev(title = evO.strn("title"), mins = evO.intn("mins"), impact = evO.strn("impact"))
+        val htO = o.objn("heat")
+        val heat = if (htO == null) null else {
+            fun tier(k: String): HeatTier? { val t = htO.objn(k) ?: return null; return HeatTier(t.intn("v"), t.strn("word"), t.strn("trend"), t.intn("rank")) }
+            fun parts(k: String): HeatParts? { val p = htO.objn(k) ?: return null; return HeatParts(p.intn("pressure"), p.intn("energy"), p.intn("volume"), p.intn("range")) }
+            val tg = htO.objn("tag")
+            Heat(tier("m"), tier("h"), tg?.strn("k"), tg?.strn("e"), parts("parts"), parts("parts_h"), htO.boolf("frozen"))
+        }
 
         rows.add(
             Row(
@@ -239,6 +258,7 @@ fun parseFeed(body: String): Feed {
                 },
                 tape = tape,
                 event = event,
+                heat = heat,
             )
         )
     }
