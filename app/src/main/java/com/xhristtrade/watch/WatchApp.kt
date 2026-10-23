@@ -829,6 +829,17 @@ private fun MarketHeatRow(r: Row, onOpen: () -> Unit) {
         Spacer(Modifier.height(3.dp))
         HeatTierRow("1m", ht.m)
         HeatTierRow("1h", ht.h)
+        // 🕯 _QT_WATCH_HEAT_LRC_ZONES_2026_10_23 — Sam: "below the 1m 1h heat data also include 1m 1h broke down broke up and all its
+        // variants just like its done on watchlist … organized aligned". The SAME ● 1m / 1h LRC zone words the watchlist row shows
+        // (broke↑ · top · upper · mid · lower · bottom · broke↓), each in its exact candle colour, 1m left and 1h right on one aligned row.
+        if (r.ind != null || r.ind1h != null) {
+            Spacer(Modifier.height(3.dp))
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                r.ind?.let { Text("● 1m ${lrcZone(it.hue, it.pos)}", color = rgbColor(it.col, it.hue), fontSize = 9.sp, fontFamily = MonoNum, maxLines = 1) }
+                Spacer(Modifier.weight(1f))
+                r.ind1h?.let { Text("● 1h ${lrcZone(it.hue, it.pos)}", color = rgbColor(it.col, it.hue), fontSize = 9.sp, fontFamily = MonoNum, maxLines = 1) }
+            }
+        }
         if (open) {
             ht.parts?.let { p ->
                 Spacer(Modifier.height(6.dp))
