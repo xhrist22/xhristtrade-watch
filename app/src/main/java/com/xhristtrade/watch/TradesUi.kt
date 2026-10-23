@@ -71,8 +71,9 @@ fun HoldBar(seconds: Int, idle: String, tint: Color, enabled: Boolean = true, on
 // ── PAGE 1: the trades ──
 @Composable
 fun TradesPage(wo: WoUi, onChanged: () -> Unit) {
+    val scroll = rememberScrollState()
     Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 14.dp),
+        Modifier.fillMaxSize().verticalScroll(scroll).bezelScroll(scroll).padding(horizontal = 14.dp),   // 🧭 bezel scrolls this page
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Spacer(Modifier.height(24.dp))

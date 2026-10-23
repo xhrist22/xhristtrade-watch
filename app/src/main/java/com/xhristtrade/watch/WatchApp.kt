@@ -13,6 +13,14 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.rotary.onRotaryScrollEvent
+import androidx.wear.compose.foundation.ExperimentalWearFoundationApi
+import androidx.wear.compose.foundation.HierarchicalFocusCoordinator
+import androidx.wear.compose.foundation.rememberActiveFocusRequester
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -41,6 +49,22 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
+// 🧭 _QT_WATCH_BEZEL_SCROLL_2026_10_23 — Sam: "move up and down on watchlist and asset pages … by moving my galaxy bezel up and down". The
+// rotating bezel / crown drives the visible page's vertical scroll (onRotaryScrollEvent → scrollBy; e.verticalScrollPixels is already
+// direction-correct + system-tuned). Only the pager's CURRENT page holds focus (rememberActiveFocusRequester inside its per-page
+// HierarchicalFocusCoordinator), so the bezel always scrolls the page you're looking at and never a neighbour kept warm offscreen.
+@OptIn(ExperimentalWearFoundationApi::class)
+@Composable
+internal fun Modifier.bezelScroll(state: ScrollState): Modifier {
+    val fr = rememberActiveFocusRequester()
+    val scope = rememberCoroutineScope()
+    return this
+        .onRotaryScrollEvent { e -> scope.launch { state.scrollBy(e.verticalScrollPixels) }; true }
+        .focusRequester(fr)
+        .focusable()
+}
+
+@OptIn(ExperimentalWearFoundationApi::class)
 @Composable
 fun WatchApp() {
     var rows by remember { mutableStateOf<List<Row>>(emptyList()) }
@@ -111,6 +135,7 @@ fun WatchApp() {
                     }
                 }
                 HorizontalPager(state = pager, modifier = Modifier.fillMaxSize()) { page ->
+                  HierarchicalFocusCoordinator(requiresFocus = { pager.currentPage == page }) {   // 🧭 only the visible page gets the bezel
                     val idx = ((page % real) + real) % real
                     when {
                         idx == 0 -> BrokerPicker(brokers, broker) { broker = it }
@@ -123,6 +148,7 @@ fun WatchApp() {
                         }
                         else -> HubPage(rows.size, updatedAt, error)
                     }
+                  }
                 }
             }
         }
@@ -149,8 +175,9 @@ private fun SplashOrError(error: String?) {
 @Composable
 private fun AssetCard(r: Row, idx: Int, total: Int, brokerName: String, basis: Double, wo: WoUi, onChanged: () -> Unit) {
     fun sp(v: Double?): Double? = v?.let { it + basis }   // shift a chart price into the selected broker's price
+    val scroll = rememberScrollState()
     Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+        Modifier.fillMaxSize().verticalScroll(scroll).bezelScroll(scroll)   // 🧭 bezel scrolls this page
             .padding(horizontal = 14.dp, vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -391,8 +418,9 @@ private fun SectionLabel(s: String) {
 // ── PAGE 0: the broker picker. Tap one; every asset page re-prices to it. Default = Chart. ──
 @Composable
 private fun BrokerPicker(brokers: List<Broker>, selected: String, onPick: (String) -> Unit) {
+    val scroll = rememberScrollState()
     Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 14.dp),
+        Modifier.fillMaxSize().verticalScroll(scroll).bezelScroll(scroll).padding(horizontal = 14.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Spacer(Modifier.height(24.dp))
@@ -489,8 +517,9 @@ private fun Banner(text: String, color: Color) {
 // the identical "1m ● zone | 1h ● zone" the QT watchlist and the asset pages draw. Swipe right from Trades to reach it.
 @Composable
 private fun WatchlistPage(rows: List<Row>, broker: String, onPick: (Int) -> Unit) {
+    val scroll = rememberScrollState()
     Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 10.dp, vertical = 6.dp),
+        Modifier.fillMaxSize().verticalScroll(scroll).bezelScroll(scroll).padding(horizontal = 10.dp, vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Spacer(Modifier.height(20.dp))   // clear the TimeText
@@ -741,8 +770,9 @@ private fun HeatPartRow(label: String, v: Int?) {
 @Composable
 private fun HubPage(count: Int, updatedAt: Long, error: String?) {
     val ctx = LocalContext.current
+    val scroll = rememberScrollState()
     Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp),
+        Modifier.fillMaxSize().verticalScroll(scroll).bezelScroll(scroll).padding(18.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
