@@ -509,14 +509,14 @@ private fun WatchlistRow(r: Row, broker: String, onClick: () -> Unit) {
         )
         // 🛑 _QT_WL_STOP_2026_10_23 — the desk stop on one aligned line, in the SELECTED broker's price (basis): 🟩 green (a stop that pays) /
         // 🟧 orange (2nd/backup SL) · SL price on the left · RR · ×ATR away on the right. Same stop the QT watchlist + chart + asset page show.
+        // 🎨 _QT_WL_STOP_COLOR_2026_10_23 — SL green when it's a paying 🟩 stop (clears the 1.3R threshold), red when not; RR green ≥1.3R, red below; ×ATR muted
         r.stop?.takeIf { !r.closed && it.price != null }?.let { st ->
-            val col = if (st.green) C.up else C.gold
+            val slCol = if (st.pays) C.up else C.down
             WlGrid(
-                left = { Text("${if (st.green) "🟩" else "🟧"} SL ${fmtPrice(st.price?.plus(basis))}", color = col, fontSize = 9.sp, fontFamily = MonoNum, maxLines = 1) },
+                left = { Text("${if (st.green) "🟩" else "🟧"} SL ${fmtPrice(st.price?.plus(basis))}", color = slCol, fontSize = 9.sp, fontFamily = MonoNum, maxLines = 1) },
                 right = {
-                    val rr = st.rr?.let { "%.2f".format(it) + "R" }
-                    val atr = st.atrAway?.let { "${it.fmt1()}×ATR" }
-                    Text(listOfNotNull(rr, atr).joinToString(" · "), color = C.muted, fontSize = 9.sp, fontFamily = MonoNum, maxLines = 1)
+                    st.rr?.let { rr -> Text("%.2f".format(rr) + "R", color = if (rr >= 1.3) C.up else C.down, fontSize = 9.sp, fontFamily = MonoNum, maxLines = 1) }
+                    st.atrAway?.let { a -> if (st.rr != null) Text(" · ", color = C.muted, fontSize = 9.sp, fontFamily = MonoNum); Text("${a.fmt1()}×ATR", color = C.muted, fontSize = 9.sp, fontFamily = MonoNum, maxLines = 1) }
                 },
             )
         }
