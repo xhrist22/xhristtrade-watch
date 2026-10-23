@@ -789,8 +789,9 @@ private fun MarketHeatPage(rows: List<Row>, goToAsset: (Int) -> Unit) {
         // 🧊 _QT_FROZEN_NEVER_RANKS_2026_10_23 — Sam: "market heat only count btc and eth when all other assets are closed". A shut market
         // still shows its last snapshot but sorts to the BOTTOM, never above a live one — so on a weekend BTC/ETH stand alone on top.
         // Hottest 1h heat first among the OPEN markets (closed last, nulls last); navigation uses the ORIGINAL feed index so pages stay put.
+        // shut = closed || frozen — the SAME condition QT's heat.js board uses (`r.closed || r.frozen`), so the watch and QT agree row-for-row.
         val ordered = rows.withIndex().sortedWith(
-            compareBy<IndexedValue<Row>> { if (it.value.closed) 1 else 0 }
+            compareBy<IndexedValue<Row>> { if (it.value.closed || it.value.heat?.frozen == true) 1 else 0 }
                 .thenByDescending { it.value.heat?.h?.v ?: -1 })
         for (iv in ordered) {
             MarketHeatRow(iv.value) { goToAsset(iv.index) }
