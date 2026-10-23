@@ -791,10 +791,11 @@ private fun MarketHeatPage(rows: List<Row>, goToAsset: (Int) -> Unit) {
     ) {
         Spacer(Modifier.height(22.dp))   // clear the TimeText
         Text("🔥 MARKET HEAT", color = C.text, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-        Text("hottest first · tap an asset for its 1m · 1h breakdown", color = C.muted, fontSize = 9.sp, textAlign = TextAlign.Center)
+        Text("hottest 1h first · tap an asset for its 1m · 1h breakdown", color = C.muted, fontSize = 9.sp, textAlign = TextAlign.Center)
         Spacer(Modifier.height(6.dp))
-        // hottest 1m heat first (nulls last); navigation uses the ORIGINAL feed index so the asset swipe pages stay put
-        val ordered = rows.withIndex().sortedWith(compareByDescending { it.value.heat?.m?.v ?: -1 })
+        // 🔥 _QT_WATCH_HEAT_RANK_1H_2026_10_23 — Sam: "make the watch ranking always be default stuck to the 1h ranking for market heat".
+        // Hottest 1h heat first (nulls last); navigation uses the ORIGINAL feed index so the asset swipe pages stay put.
+        val ordered = rows.withIndex().sortedWith(compareByDescending { it.value.heat?.h?.v ?: -1 })
         for (iv in ordered) {
             MarketHeatRow(iv.value) { goToAsset(iv.index) }
             Spacer(Modifier.height(6.dp))
