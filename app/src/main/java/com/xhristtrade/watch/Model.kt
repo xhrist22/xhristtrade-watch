@@ -64,7 +64,7 @@ data class Ev(val title: String?, val mins: Int?, val impact: String?)
 
 // 🔥 _QT_HEAT_ON_EVERY_ROW_2026_10_23 — the market heat (lib/heat.js) folded onto the row, the SAME read QT's heat chip/card show:
 // each clock (1m, 1h) its value/word/trend, the 1m×1h synergy tag (its word + emoji), and the four driver parts graded 0-100.
-data class HeatTier(val v: Int?, val word: String?, val trend: String?, val rank: Int?)   // trend: "heating" ↗ / "cooling" ↘ / "steady"
+data class HeatTier(val v: Int?, val word: String?, val trend: String?, val rank: Int?, val icon: String?)   // icon: 🌫️ warming / ❄️ cold / 🔥 hot / 🌋 boiling · trend: "heating" ↗ / "cooling" ↘ / "steady"
 data class HeatParts(val pressure: Int?, val energy: Int?, val volume: Int?, val range: Int?)   // KURU pressure · WAE energy · volume pace · move size
 data class Heat(
     val m: HeatTier?, val h: HeatTier?,
@@ -212,7 +212,7 @@ fun parseFeed(body: String): Feed {
         val event = if (evO == null) null else Ev(title = evO.strn("title"), mins = evO.intn("mins"), impact = evO.strn("impact"))
         val htO = o.objn("heat")
         val heat = if (htO == null) null else {
-            fun tier(k: String): HeatTier? { val t = htO.objn(k) ?: return null; return HeatTier(t.intn("v"), t.strn("word"), t.strn("trend"), t.intn("rank")) }
+            fun tier(k: String): HeatTier? { val t = htO.objn(k) ?: return null; return HeatTier(t.intn("v"), t.strn("word"), t.strn("trend"), t.intn("rank"), t.strn("icon")) }
             fun parts(k: String): HeatParts? { val p = htO.objn(k) ?: return null; return HeatParts(p.intn("pressure"), p.intn("energy"), p.intn("volume"), p.intn("range")) }
             val tg = htO.objn("tag")
             Heat(tier("m"), tier("h"), tg?.strn("k"), tg?.strn("e"), parts("parts"), parts("parts_h"), htO.boolf("frozen"))

@@ -599,7 +599,8 @@ private fun HeatInline(tf: String, t: HeatTier?) {
     Text(tf, color = C.muted, fontSize = 9.sp, fontFamily = MonoNum)
     Spacer(Modifier.width(3.dp))
     if (t?.v == null) { Text("·", color = C.muted, fontSize = 9.sp); return }
-    HeatBar(t.v, Modifier.width(22.dp))
+    t.icon?.let { Text(it, fontSize = 9.sp); Spacer(Modifier.width(2.dp)) }   // 🔥 the heat emoji (🌫️/❄️/🔥/🌋) per clock
+    HeatBar(t.v, Modifier.width(20.dp))
     Spacer(Modifier.width(3.dp))
     Text("${t.v}${heatArrow(t.trend)}", color = C.text, fontSize = 9.sp, fontFamily = MonoNum, maxLines = 1)
 }
@@ -670,6 +671,7 @@ private fun HeatTierRow(tf: String, t: HeatTier?) {
         Text(tf, color = C.muted, fontSize = 10.sp, fontFamily = MonoNum, textAlign = TextAlign.End, modifier = Modifier.width(20.dp))
         Spacer(Modifier.width(6.dp))
         if (t?.v == null) { Text("—", color = C.muted, fontSize = 10.sp); return@Row }
+        t.icon?.let { Text(it, fontSize = 10.sp); Spacer(Modifier.width(4.dp)) }   // 🔥 the heat emoji (🌫️/❄️/🔥/🌋) per clock
         HeatBar(t.v, Modifier.weight(1f))
         Spacer(Modifier.width(6.dp))
         Text("${t.v}${heatArrow(t.trend)}", color = C.text, fontSize = 10.sp, fontFamily = MonoNum, maxLines = 1, modifier = Modifier.width(34.dp))
