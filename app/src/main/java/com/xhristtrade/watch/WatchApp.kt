@@ -306,19 +306,19 @@ private fun AssetCard(r: Row, idx: Int, total: Int, brokerName: String, basis: D
         r.entry?.let { PlanRow("now", fmtPrice(sp(it)), C.text) }
         r.stop?.let { s ->
             val tag = if (s.green) (if (s.pays) "🟩 pays" else "🟩") else "🟧"
-            val atr = s.atrAway?.let { " ·${it.fmt1()}×ATR" } ?: ""
+            val atr = s.atrAway?.let { " ·${it.fmt2()}×ATR" } ?: ""
             PlanRow("SL", "$tag ${fmtPrice(sp(s.price))}$atr", if (s.green) C.up else C.gold)
             // 📊 _QT_WATCH_HIT_ODDS_OWN_ROW_2026_10_22 — the "chance it gets hit" (reach_pct, history magnet) sits on its OWN row with a
             // 3-char label and a tiny value ("📊 SL 58%") directly under the level it belongs to. A combined "SL n% · TP3 n%" line was
             // still too wide and the round watch clipped the TP3 tail; a value this short can NEVER be clipped.
             s.reachPct?.let { PlanRow("hit", "📊 SL $it%", C.muted) }
-            s.rr?.let { PlanRow("RR", "%.2f".format(it), rrColor(it)) }
+            s.rr?.let { PlanRow("RR", "${it.fmtR()}R", rrColor(it)) }
         }
         r.target?.let { t ->
             val src = t.from?.let { " ·$it" } ?: ""
             PlanRow("TP3", "📈 ${fmtPrice(sp(t.price))}$src", C.text)
             t.reachPct?.let { PlanRow("hit", "📊 TP3 $it%", C.muted) }   // 📊 chance price REACHES TP3 — own short row, never clipped
-            if (r.stop?.rr == null) t.rr?.let { PlanRow("RR", "%.2f".format(it), rrColor(it)) }
+            if (r.stop?.rr == null) t.rr?.let { PlanRow("RR", "${it.fmtR()}R", rrColor(it)) }
         }
         // 🎞 _QT_WATCH_1H_TAPE_2026_10_22 — below the hit rows: the 1h tape (who hit harder) + a plain "means", in sync with the QT candle card
         r.tape?.let { tp ->
@@ -328,7 +328,7 @@ private fun AssetCard(r: Row, idx: Int, total: Int, brokerName: String, basis: D
         r.backup?.let { b ->
             // 📏 _QT_ORANGE_SL_ATR_2026_10_22 — the 🟧 2nd SL shows its ×ATR distance too, exactly like the 🟩 green SL (the main orange SL
             // already does via the SL row). So every stop on the watch — green or orange, main or backup — reads its distance in ATR.
-            val atr = b.atrAway?.let { " ·${it.fmt1()}×ATR" } ?: ""
+            val atr = b.atrAway?.let { " ·${it.fmt2()}×ATR" } ?: ""
             PlanRow("2nd SL", "🟧 ${fmtPrice(sp(b.price))}$atr", C.gold)
         }
 
@@ -621,8 +621,8 @@ private fun WatchlistRow(r: Row, broker: String, onClick: () -> Unit) {
             WlGrid(
                 left = { Text("${if (st.green) "🟩" else "🟧"} SL ${fmtPrice(st.price?.plus(basis))}", color = slCol, fontSize = 9.sp, fontFamily = MonoNum, maxLines = 1) },
                 right = {
-                    st.rr?.let { rr -> Text("%.2f".format(rr) + "R", color = if (rr >= 1.3) C.up else C.down, fontSize = 9.sp, fontFamily = MonoNum, maxLines = 1) }
-                    st.atrAway?.let { a -> if (st.rr != null) Text(" · ", color = C.muted, fontSize = 9.sp, fontFamily = MonoNum); Text("${a.fmt1()}×ATR", color = C.muted, fontSize = 9.sp, fontFamily = MonoNum, maxLines = 1) }
+                    st.rr?.let { rr -> Text(rr.fmtR() + "R", color = if (rr >= 1.3) C.up else C.down, fontSize = 9.sp, fontFamily = MonoNum, maxLines = 1) }
+                    st.atrAway?.let { a -> if (st.rr != null) Text(" · ", color = C.muted, fontSize = 9.sp, fontFamily = MonoNum); Text("${a.fmt2()}×ATR", color = C.muted, fontSize = 9.sp, fontFamily = MonoNum, maxLines = 1) }
                 },
             )
         }
@@ -1020,8 +1020,9 @@ private fun dots(idx: Int, total: Int): String {
     for (i in 0 until total) sb.append(if (i == idx) "●" else "·")
     return sb.toString()
 }
-private fun Double.fmt1(): String = "%.1f".format(this)
 private fun Double.fmt2(): String = "%.2f".format(this)
+// 📏 _QT_ONE_PRICE_ONE_R_2026_11_03 — R floored to 0.1 like QT fmtR + the Telegram cards (1.29 never reads 1.3R); × ATR uses fmt2 (QT toFixed(2))
+private fun Double.fmtR(): String = "%.1f".format(kotlin.math.floor(this * 10) / 10)
 
 private fun freshness(updatedAt: Long, error: String?): String {
     if (error != null) return error
