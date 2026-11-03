@@ -32,6 +32,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -238,6 +241,11 @@ private fun AssetCard(r: Row, idx: Int, total: Int, brokerName: String, basis: D
                 Spacer(Modifier.height(5.dp))
                 KwVerdictCard(kv)
             }
+            // 🫧⚖️ _QT_BUBBLE_VERDICT_2026_10_26 — the big-order verdict (= the QT chart ring / card / watchlist chip, one source): the full read.
+            r.bubble?.let { bv ->
+                Spacer(Modifier.height(4.dp))
+                Text("🫧 " + (bv.tf?.let { "$it " } ?: "") + (bv.line ?: (bv.state ?: "")) + bubAgo(bv.tSec).let { if (it.isEmpty()) "" else if (it == "now") " · just now" else " · $it ago" }, color = bubbleColor(bv.tone), fontSize = 10.sp, softWrap = true, modifier = Modifier.fillMaxWidth())
+            }
             // 🌙 _QT_WATCH_CLOSED_SNAPSHOT_2026_10_22 — when the market is shut, the mode has no live reading (was a bare "mode = —"); say it's
             // the frozen last snapshot instead of a dash. The 🌙 CLOSED banner on top already flags the whole page as a snapshot.
             // 🎨 _QT_WAE_TAG_COLOR_SYNC_2026_10_23 — the WAE mode row wears the EXACT QT chip colour (shared waeTagColor), in sync with the chip
@@ -266,15 +274,26 @@ private fun AssetCard(r: Row, idx: Int, total: Int, brokerName: String, basis: D
                         Text(fmtPrice(sp(r.entry ?: ind.px)), color = indColor(ind), fontFamily = MonoNum,
                             fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                         Spacer(Modifier.height(2.dp))
-                        // 1m & 1h LRC colour (the REAL candle rgb ● swatch), aligned on = and bordered by | :  tf = ● zone | likely move
-                        LrcTfLine("1m", ind.hue, ind.pos, ind.col)
+                        // 🪆 _QT_WL_4H_TIER_2026_10_24 — 4h · 1h · 1m, read top→bottom (the TIDE first), the SAME fractal order as the cheat sheet
+                        // & QT watchlist. Each is the REAL candle rgb ● swatch, aligned on = and bordered by | :  tf = ● zone | likely move
+                        r.ind4h?.let { LrcTfLine("4h", it.hue, it.pos, it.col) }
                         r.ind1h?.let { LrcTfLine("1h", it.hue, it.pos, it.col) }
+                        LrcTfLine("1m", ind.hue, ind.pos, ind.col)
                     }
                     Text("▁ ${fmtPrice(sp(ind.lower))}", color = C.muted, fontFamily = MonoNum, fontSize = 9.sp)
                 }
             }
-            // 🕯 _QT_LRC_1M_1H_MEAN_2026_10_23 — below the 1m | 1h colours: what the same/different colour means for the move (current candles), same read as QT
-            r.lrcMean?.text?.let { txt ->
+            // 🎨 _QT_FRACTAL_VERDICT_ONE_SOURCE_2026_10_24 — below the 4h·1h·1m colours: the cheat sheet's colour-positioning verdict (bold lead +
+            // plain body, tone = the 4h tide), the SAME sentence QT's watchlist shows. Falls back to the older 1m-vs-1h mean until the 4h tier is in.
+            val lv = r.lrcVerdict
+            if (lv != null && !(lv.lead.isNullOrBlank() && lv.body.isNullOrBlank())) {
+                Spacer(Modifier.height(5.dp))
+                val vc = verdictColor(lv.tone)
+                Text(buildAnnotatedString {
+                    if (!lv.lead.isNullOrBlank()) { withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(lv.lead) }; append(" ") }
+                    append(lv.body ?: "")
+                }, color = vc, fontSize = 10.sp, softWrap = true, modifier = Modifier.fillMaxWidth())
+            } else r.lrcMean?.text?.let { txt ->
                 Spacer(Modifier.height(5.dp))
                 Text(txt, color = lrcMeanColor(r.lrcMean.tone), fontSize = 10.sp, softWrap = true, modifier = Modifier.fillMaxWidth())
             }
@@ -328,7 +347,7 @@ private fun AssetCard(r: Row, idx: Int, total: Int, brokerName: String, basis: D
         // heat with the ↗/↘ trend, the 1m×1h synergy tag, and (when opened) the four driver bars on both clocks — the SAME QT heat card read.
         r.heat?.let {
             Spacer(Modifier.height(10.dp))
-            HeatSection(it)
+            HeatSection(it, r.ind4h, r.lrcVerdict)
         }
 
         // 📱 hold 3s → open THIS asset on the phone's QT
@@ -560,16 +579,35 @@ private fun WatchlistRow(r: Row, broker: String, onClick: () -> Unit) {
         Spacer(Modifier.height(2.dp))
         // 📊 _QT_WL_ALIGNED_GRID_2026_10_23 — Sam: "include its legs just like qt pc does it" + "organize and align all". One tidy two-column
         // grid so every row lines up:  legs meter │ WAE  ·  1m LRC │ 1h LRC  ·  N short │ ✈️ far. Same data + wording as the QT watchlist.
-        val shortN = r.call?.let { Regex("(\\d+)\\s*short").find(it)?.groupValues?.getOrNull(1) }
-            ?: run { val li = r.lit; val le = r.legs; if (li != null && le != null && le > li) (le - li).toString() else null }
+        // 🎯 _QT_WATCH_SHORT_FROM_CHARTWIRE_2026_10_26 — Sam: "gold saying 6 short when its really 1 short". ChartWire's OWN count
+        // is authoritative: the server appends it as a DIGIT ("| N short"), but phrases 1 as the number-WORD "ONE SHORT". The old
+        // \d+ parse missed that and fell back to legs−lit (7−1=6), the WRONG number. Read digit OR one…ten; legs−lit only as fallback.
+        val shortN = run {
+            val c = r.call ?: ""
+            val d = Regex("(\\d+)\\s*short", RegexOption.IGNORE_CASE).find(c)?.groupValues?.getOrNull(1)?.toIntOrNull()
+            val words = mapOf("one" to 1, "two" to 2, "three" to 3, "four" to 4, "five" to 5, "six" to 6, "seven" to 7, "eight" to 8, "nine" to 9, "ten" to 10)
+            val w = Regex("\\b(one|two|three|four|five|six|seven|eight|nine|ten)\\s+short", RegexOption.IGNORE_CASE).find(c)?.groupValues?.getOrNull(1)?.lowercase()?.let { words[it] }
+            val cw = d ?: w
+            val leg = run { val li = r.lit; val le = r.legs; if (li != null && le != null && le > li) le - li else null }
+            (cw ?: leg)?.toString()
+        }
         WlGrid(
             left = { LegsInline(r.lit, r.legs) },
             right = { r.wae?.let { WaeInline(it) } },
         )
-        WlGrid(
-            left = { r.ind?.let { Text("●", color = rgbColor(it.col, it.hue), fontSize = 9.sp); Text(" 1m ${lrcZone(it.hue, it.pos)}", color = C.muted, fontSize = 9.sp, fontFamily = MonoNum, maxLines = 1) } },
-            right = { r.ind1h?.let { Text("●", color = rgbColor(it.col, it.hue), fontSize = 9.sp); Text(" 1h ${lrcZone(it.hue, it.pos)}", color = C.muted, fontSize = 9.sp, fontFamily = MonoNum, maxLines = 1) } },
-        )
+        // 🪆 _QT_WL_4H_TIER_2026_10_24 — LRC dots run 🪆 4h → 🌊 1h → 💧 1m, LEFT to RIGHT (same fractal order as the cheat sheet + QT watchlist)
+        Row(Modifier.fillMaxWidth().padding(top = 1.dp), verticalAlignment = Alignment.CenterVertically) {
+            LrcDotCell("4h", r.ind4h?.hue, r.ind4h?.pos, r.ind4h?.col, Modifier.weight(1f))
+            LrcDotCell("1h", r.ind1h?.hue, r.ind1h?.pos, r.ind1h?.col, Modifier.weight(1f))
+            LrcDotCell("1m", r.ind?.hue, r.ind?.pos, r.ind?.col, Modifier.weight(1f))
+        }
+        // 🎨 the 4h·1h·1m verdict (the cheat sheet, tone = the 4h tide) — the watchlist row's one-line read, in sync with the asset page + QT
+        r.lrcVerdict?.let { lv -> if (!lv.lead.isNullOrBlank() || !lv.body.isNullOrBlank()) Text(
+            buildAnnotatedString { if (!lv.lead.isNullOrBlank()) { withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(lv.lead) }; append(" ") }; append(lv.body ?: "") },
+            color = verdictColor(lv.tone), fontSize = 9.sp, softWrap = true, maxLines = 2, modifier = Modifier.fillMaxWidth().padding(top = 1.dp)) }
+        // 🫧⚖️ _QT_BUBBLE_VERDICT_2026_10_26 — the big-order verdict chip on the watchlist row (= the QT chart ring + Ranked chip; one source)
+        r.bubble?.let { bv -> Text("🫧 " + (bv.tf?.let { t -> "$t " } ?: "") + (bv.state ?: "") + (bv.wallName?.let { " · $it" } ?: "") + (if (bv.ice) " 🧊" else "") + bubAgo(bv.tSec).let { if (it.isEmpty()) "" else " · $it" },
+            color = bubbleColor(bv.tone), fontSize = 9.sp, softWrap = true, maxLines = 1, modifier = Modifier.fillMaxWidth().padding(top = 1.dp)) }
         if (shortN != null || !r.far.isNullOrBlank()) WlGrid(
             left = { shortN?.let { Text("$it short", color = C.muted, fontSize = 9.sp, fontFamily = MonoNum) } },
             right = { r.far?.takeIf { it.isNotBlank() }?.let { Text("✈️ $it", color = C.explosion, fontSize = 9.sp, fontFamily = MonoNum) } },
@@ -664,6 +702,31 @@ private fun HeatBar(value: Int?, modifier: Modifier = Modifier) {
 private fun heatArrow(trend: String?): String = when (trend) { "heating" -> "↗"; "cooling" -> "↘"; else -> "" }
 // 🕯🎨 the 1m-vs-1h LRC meaning tone → colour by ALIGNMENT (Sam): aligned = green · opposed = red · coiling = yellow (whichever way price goes)
 private fun lrcMeanColor(tone: String?): Color = when (tone) { "aligned" -> C.up; "oppose" -> C.down; "coil" -> C.yellow; else -> C.muted }
+// 🎨 _QT_FRACTAL_VERDICT_ONE_SOURCE_2026_10_24 — the 4h·1h·1m verdict tone = the 4h TIDE: up green · down orange · coiling yellow · mixed muted
+private fun verdictColor(tone: String?): Color = when (tone) { "up" -> C.up; "down" -> C.lrcOrange; "coil" -> C.yellow; else -> C.muted }
+// 🫧⚖️ _QT_BUBBLE_VERDICT_2026_10_26 — the big-order tag is coloured by DIRECTION: 🟢 up (green) · 🔴 down (red) · 🟡 pending/undecided (yellow)
+private fun bubbleColor(tone: String?): Color = when (tone) { "up" -> C.up; "down" -> C.down; "pending" -> C.yellow; else -> C.muted }
+// 🫧⚖️ _QT_BUBBLE_WHEN_2026_10_27 — how long ago the big-order candle was (live at render); "" when unknown, "now" under a minute.
+private fun bubAgo(t: Long?): String {
+    if (t == null || t <= 0L) return ""
+    val s = (System.currentTimeMillis() / 1000L - t).coerceAtLeast(0L)
+    if (s < 60L) return "now"
+    val m = s / 60L
+    if (m < 60L) return "${m}m"
+    val h = m / 60L
+    return "${h}h" + (if (m % 60L != 0L) "${m % 60L}m" else "")
+}
+
+// 🪆 one compact "● 4h upper" LRC cell — the dot is the EXACT candle rgb, the word its channel zone. Empty when that tier isn't in yet.
+@Composable
+private fun LrcDotCell(tf: String, hue: String?, pos: Double?, col: IntArray?, modifier: Modifier = Modifier) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+        if (hue != null || col != null) {
+            Text("●", color = rgbColor(col, hue), fontSize = 9.sp)
+            Text(" $tf ${lrcZone(hue, pos)}", color = C.muted, fontSize = 9.sp, fontFamily = MonoNum, maxLines = 1)
+        } else Text("$tf ·", color = C.muted, fontSize = 9.sp, fontFamily = MonoNum)
+    }
+}
 // tone word → colour (both tier words cold/warming/hot/boiling and tag words aligned/spike/pause/building/stirring/simmer/quiet)
 private fun heatToneColor(word: String?): Color = when (word?.lowercase()) {
     "boiling" -> C.down
@@ -689,7 +752,7 @@ private fun HeatInline(tf: String, t: HeatTier?) {
 // market heat (lib/heat.js) as QT's heat card: 1m + 1h heat with the ↗/↘ trend, the 1m×1h synergy tag, and the four driver bars
 // (📊 KURU pressure · 🌋 WAE energy · 🫧 volume pace · 📏 move size) on both clocks, each a temperature-coloured liquid bar.
 @Composable
-private fun HeatSection(ht: Heat) {
+private fun HeatSection(ht: Heat, tide: Lrc1h? = null, verdict: LrcVerdict? = null) {
     if (ht.m == null && ht.h == null) return
     var open by remember { mutableStateOf(false) }
     Column(
@@ -707,6 +770,16 @@ private fun HeatSection(ht: Heat) {
             ht.tagEmoji?.let { e -> Text(e + (ht.tagWord ?: ""), color = heatToneColor(ht.tagWord), fontSize = 9.sp, maxLines = 1) }
             Spacer(Modifier.width(5.dp))
             Text(if (open) "▾" else "▸", color = C.muted, fontSize = 10.sp)
+        }
+        // 🪆 _QT_WL_4H_TIER_2026_10_24 — the 4h TIDE the heat sits inside: the SAME 4h LRC ● dot + zone the watchlist & asset card show, always
+        // visible so the market-heat read carries the big direction too (the 1m/1h heat is graded vs each clock's own past; the 4h is the tide).
+        tide?.let { t ->
+            Spacer(Modifier.height(3.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("🪆 4h tide ", color = C.muted, fontSize = 9.sp)
+                Text("●", color = rgbColor(t.col, t.hue), fontSize = 9.sp)
+                Text(" ${lrcZone(t.hue, t.pos)}", color = C.muted, fontSize = 9.sp, fontFamily = MonoNum, maxLines = 1)
+            }
         }
         if (!open) {
             Spacer(Modifier.height(4.dp))
@@ -739,6 +812,12 @@ private fun HeatSection(ht: Heat) {
                 HeatPartRow("🫧 volume pace", p.volume)
                 HeatPartRow("📏 move size", p.range)
             }
+            // 🎨 the 4h·1h·1m colour-positioning verdict (the cheat sheet, tone = the tide) — the one-line read tying the heat to the fractal
+            verdict?.let { lv -> if (!lv.lead.isNullOrBlank() || !lv.body.isNullOrBlank()) {
+                Spacer(Modifier.height(7.dp))
+                Text(buildAnnotatedString { if (!lv.lead.isNullOrBlank()) { withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(lv.lead) }; append(" ") }; append(lv.body ?: "") },
+                    color = verdictColor(lv.tone), fontSize = 9.sp, softWrap = true, modifier = Modifier.fillMaxWidth())
+            } }
         }
     }
 }

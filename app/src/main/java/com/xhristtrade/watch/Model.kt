@@ -79,6 +79,12 @@ data class KwVerdict(val kuru: String?, val wae: String?, val price: String?, va
 
 // 🕯 _QT_LRC_1M_1H_MEAN_2026_10_23 — what the 1m vs 1h LRC candle colours mean for the move (same=continuation · opposite=bounce/pullback · yellow=coiling), from the current candles (= QT)
 data class LrcMean(val text: String?, val tone: String?)
+// 🎨 _QT_FRACTAL_VERDICT_ONE_SOURCE_2026_10_24 — the 4h·1h·1m colour-positioning verdict (the SAME cheat-sheet sentence QT shows): a bold lead,
+// the plain body, and a tone = the 4h tide (up / down / coil / mixed) → the colour of the whole read. Server lib/fractal-verdict.js, ONE source.
+data class LrcVerdict(val lead: String?, val body: String?, val tone: String?)
+// 🫧⚖️ _QT_BUBBLE_VERDICT_2026_10_26 — the big-order verdict (= the QT chart ring / card / watchlist chip): a bubble is a PUNCH — did it
+// land, on what wall, confirmed by the next candle? tone = where price is headed (up/down/pending); state = pending/continuation/reversal.
+data class BubbleV(val glyph: String?, val state: String?, val strength: Int?, val tone: String?, val side: String?, val line: String?, val wallName: String?, val ice: Boolean, val tf: String?, val tSec: Long?)   // tf = 1m|1h · tSec = the candle's epoch-seconds (_QT_BUBBLE_WHEN_2026_10_27)
 
 data class Row(
     val asset: String,
@@ -100,6 +106,7 @@ data class Row(
     val lrcLeg: String?,
     val ind: Ind?,
     val ind1h: Lrc1h?,
+    val ind4h: Lrc1h?,             // 🪆 the 4h LRC candle (the TIDE) — SAME shape as ind1h, so the watchlist / card / heat draw a 3rd dot
     val entry: Double?,
     val stop: Stop?,
     val backup: Stop?,
@@ -114,7 +121,13 @@ data class Row(
     val heat: Heat?,               // 🔥 the 1m/1h market heat + synergy tag + driver parts (= QT heat)
     val kw: KwVerdict?,            // 🤝 the KURU + WAE "→ price …" verdict (= the QT chart banner)
     val lrcMean: LrcMean?,         // 🕯 what the 1m vs 1h LRC colours mean for the move (= QT)
+    val lrcVerdict: LrcVerdict?,   // 🎨 the 4h·1h·1m colour-positioning verdict (= the cheat sheet; supersedes lrcMean when all 3 tiers are in)
+    val bubble: BubbleV?,          // 🫧⚖️ the big-order verdict (= the QT chart ring + card + watchlist chip; one source)
+    val mr: Fade? = null,          // 🔄 the fade side QT's button would take (server row.mr) — works with no desk side
 )
+
+// 🔄 _QT_WATCH_FADE_SIDE_IS_QTS_2026_11_03 — the server's fade answer: side BUY/SELL, basis desk/vwap/run, or why there is none
+data class Fade(val ok: Boolean, val side: String?, val basis: String?, val why: String?)
 
 // a broker/account you can price the board in — name, its gap vs the chart on THIS asset (null = never measured), its mode
 data class Broker(val name: String, val basis: Double?, val mode: String?)
@@ -132,6 +145,10 @@ internal fun JSONObject.boolf(k: String): Boolean = optBoolean(k, false)
 internal fun JSONObject.intn(k: String): Int? {
     if (!has(k) || isNull(k)) return null
     return optInt(k, Int.MIN_VALUE).let { if (it == Int.MIN_VALUE) null else it }
+}
+internal fun JSONObject.longn(k: String): Long? {
+    if (!has(k) || isNull(k)) return null
+    return optLong(k, Long.MIN_VALUE).let { if (it == Long.MIN_VALUE) null else it }
 }
 internal fun JSONObject.strn(k: String): String? {
     if (!has(k) || isNull(k)) return null
@@ -187,6 +204,11 @@ fun parseFeed(body: String): Feed {
             hue = i1hO.strn("hue"), pos = i1hO.dbl("pos"), col = parseRgb(i1hO.strn("col")),
             px = i1hO.dbl("px"), ema9 = i1hO.dbl("ema9"), e9 = i1hO.dbl("e9"),
         )
+        val i4hO = o.objn("ind_4h")
+        val ind4h = if (i4hO == null) null else Lrc1h(
+            hue = i4hO.strn("hue"), pos = i4hO.dbl("pos"), col = parseRgb(i4hO.strn("col")),
+            px = i4hO.dbl("px"), ema9 = i4hO.dbl("ema9"), e9 = i4hO.dbl("e9"),
+        )
 
         val kO = o.objn("kuru")
         val kuru = if (kO == null) null else Kuru(
@@ -223,6 +245,10 @@ fun parseFeed(body: String): Feed {
         val kw = if (kwO == null) null else KwVerdict(kwO.strn("kuru"), kwO.strn("wae"), kwO.strn("price"), kwO.strn("head"), kwO.strn("tone"))
         val lmO = o.objn("lrc_mean")
         val lrcMean = if (lmO == null) null else LrcMean(lmO.strn("text"), lmO.strn("tone"))
+        val lvO = o.objn("lrc_verdict")
+        val lrcVerdict = if (lvO == null) null else LrcVerdict(lvO.strn("lead"), lvO.strn("body"), lvO.strn("tone"))
+        val bvO = o.objn("bubble")   // 🫧⚖️ _QT_BUBBLE_VERDICT_2026_10_26
+        val bubble = if (bvO == null) null else { val wO = bvO.objn("wall"); BubbleV(bvO.strn("glyph"), bvO.strn("state"), bvO.intn("strength"), bvO.strn("tone"), bvO.strn("side"), bvO.strn("line"), wO?.strn("name"), wO?.boolf("ice") ?: false, bvO.strn("tf"), bvO.longn("t")) }
         val htO = o.objn("heat")
         val heat = if (htO == null) null else {
             fun tier(k: String): HeatTier? { val t = htO.objn(k) ?: return null; return HeatTier(t.intn("v"), t.strn("word"), t.strn("trend"), t.intn("rank"), t.strn("icon")) }
@@ -252,6 +278,7 @@ fun parseFeed(body: String): Feed {
                 lrcLeg = o.strn("lrc_leg"),
                 ind = ind,
                 ind1h = ind1h,
+                ind4h = ind4h,
                 entry = o.dbl("entry"),
                 stop = stopOf(o.objn("stop")),
                 backup = stopOf(o.objn("backup")),
@@ -274,6 +301,9 @@ fun parseFeed(body: String): Feed {
                 heat = heat,
                 kw = kw,
                 lrcMean = lrcMean,
+                lrcVerdict = lrcVerdict,
+                bubble = bubble,
+                mr = o.objn("mr")?.let { Fade(it.boolf("ok"), it.strn("side"), it.strn("basis"), it.strn("why")) },
             )
         )
     }

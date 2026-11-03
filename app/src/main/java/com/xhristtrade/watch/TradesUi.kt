@@ -226,19 +226,23 @@ fun OrderHoldButton(r: Row, broker: String, wo: WoUi, onChanged: () -> Unit) {
 // computes both). A deliberate 3-second hold, purple (the counter colour), 0.5 % and the bot trails it — the watch twin of QT's 🔄 button.
 @Composable
 fun MrHoldButton(r: Row, broker: String, wo: WoUi, onChanged: () -> Unit) {
+    // 🔄 _QT_WATCH_FADE_SIDE_IS_QTS_2026_11_03 — the side comes from the server (row.mr = QT's own fade answer): the opposite of the desk
+    // side, or with no desk side back to VWAP / against the last hour's run — so the watch fades exactly when and where QT's button does
     val deskSide = r.side?.uppercase()
-    val fade = if (deskSide == "BUY") "SELL" else if (deskSide == "SELL") "BUY" else null
+    val fade = r.mr?.takeIf { it.ok }?.side?.uppercase()?.takeIf { it == "BUY" || it == "SELL" }
+        ?: if (r.mr == null) (if (deskSide == "BUY") "SELL" else if (deskSide == "SELL") "BUY" else null) else null   // an older server: the desk's opposite
+    val fadeVs = when (r.mr?.basis) { "vwap" -> " → VWAP"; "run" -> " vs the run"; else -> "" }
     val acct = wo.feed?.roster?.firstOrNull { it.name == broker }
     val why = when {
         wo.paired != true -> "🔐 pair the watch on the Trades page"
         broker == "Chart" -> "🏦 pick a broker on page 1 to fade"
         acct == null -> "🏦 $broker isn't on the account list"
-        fade == null -> "no desk side to fade"
+        fade == null -> r.mr?.why ?: "no direction to fade yet"
         wo.feed?.off == true -> "⛔ watch orders are OFF"
         else -> null
     }
     var res by remember(r.asset, broker) { mutableStateOf<String?>(null) }
-    val label = if (why != null) why else "🔄 hold 5s → fade $fade ${r.asset}" + if (acct?.mode == "watch") " (ticket)" else ""
+    val label = if (why != null) why else "🔄 hold 5s → fade $fade ${r.asset}$fadeVs" + if (acct?.mode == "watch") " (ticket)" else ""
     HoldBar(5, label, Color(0xFFC084FC), enabled = why == null) {
         res = when (val x = Orders.signed("order", mapOf("asset" to r.asset, "side" to fade, "inst" to acct!!.inst, "broker" to acct.name, "mode" to "mr"))) {
             is WoResult.Ok -> describeOrder(x.json, acct.name)

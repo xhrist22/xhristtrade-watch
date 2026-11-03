@@ -162,11 +162,12 @@ fun LrcBar(ind: Ind, modifier: Modifier) {
             drawRect(
                 brush = Brush.verticalGradient(listOf(C.lrcAqua, C.lrcYellow, C.lrcRed), startY = yU, endY = yL),
                 topLeft = Offset(x0, yU),
-                size = androidx.compose.ui.geometry.Size(tubeW, (yL - yU).coerceAtLeast(1f)), alpha = 0.6f,
+                size = androidx.compose.ui.geometry.Size(tubeW, (yL - yU).coerceAtLeast(1f)), alpha = 0.72f,
             )
-            // the 2 LRC EDGES (upper + lower rail) — the borders
-            drawLine(C.text.copy(alpha = 0.9f), Offset(x0, yU), Offset(x0 + tubeW, yU), strokeWidth = 1.6f)
-            drawLine(C.text.copy(alpha = 0.9f), Offset(x0, yL), Offset(x0 + tubeW, yL), strokeWidth = 1.6f)
+            // 👁 _QT_WATCH_LRC_BAR_EDGES_VISIBLE_2026_10_26 — Sam: "hard to see the edges". The 2 LRC EDGES (upper + lower
+            // rail) are now full-brightness, thicker, round-capped and reach slightly past the tube so each rail reads clearly.
+            drawLine(C.text, Offset(x0 - 3f, yU), Offset(x0 + tubeW + 3f, yU), strokeWidth = 3f, cap = StrokeCap.Round)
+            drawLine(C.text, Offset(x0 - 3f, yL), Offset(x0 + tubeW + 3f, yL), strokeWidth = 3f, cap = StrokeCap.Round)
             // EMA9 — the YELLOW line
             E?.let { drawLine(C.lrcYellow, Offset(x0 - 5f, y(it)), Offset(x0 + tubeW + 5f, y(it)), strokeWidth = 2.4f, cap = StrokeCap.Round) }
             // PRICE marker — just the candle-colour puck (no redundant level line); EMA9 is the yellow line above
@@ -180,9 +181,9 @@ fun LrcBar(ind: Ind, modifier: Modifier) {
             val f = (ind.bc ?: 0.5).coerceIn(0.0, 1.0).toFloat()
             drawCircle(indColor(ind), radius = tubeW * 0.32f, center = Offset(w / 2f, h * (1f - f)))
         }
-        // tube outline
-        drawRoundRect(C.border, topLeft = Offset(x0, 0f),
-            size = androidx.compose.ui.geometry.Size(tubeW, h), cornerRadius = cr, style = Stroke(width = 1.2f))
+        // tube outline — brighter so the bar's extent reads (_QT_WATCH_LRC_BAR_EDGES_VISIBLE)
+        drawRoundRect(C.text.copy(alpha = 0.3f), topLeft = Offset(x0, 0f),
+            size = androidx.compose.ui.geometry.Size(tubeW, h), cornerRadius = cr, style = Stroke(width = 1.6f))
     }
 }
 
