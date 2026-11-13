@@ -242,8 +242,9 @@ fun MrHoldButton(r: Row, broker: String, wo: WoUi, onChanged: () -> Unit) {
         else -> null
     }
     var res by remember(r.asset, broker) { mutableStateOf<String?>(null) }
-    val label = if (why != null) why else "🔄 hold 5s → fade $fade ${r.asset}$fadeVs" + if (acct?.mode == "watch") " (ticket)" else ""
-    HoldBar(5, label, Color(0xFFC084FC), enabled = why == null) {
+    val label = if (why != null) why else "🔄 hold 3s → fade $fade ${r.asset}$fadeVs" + if (acct?.mode == "watch") " (ticket)" else ""
+    // ⏱ _QT_WATCH_FADE_HOLD_3S_2026_11_13 — Sam: "make the mean reversion button hold 3 second instead of 5" (QT's 🔄 is MR_HOLD_MS = 3000)
+    HoldBar(3, label, Color(0xFFC084FC), enabled = why == null) {
         res = when (val x = Orders.signed("order", mapOf("asset" to r.asset, "side" to fade, "inst" to acct!!.inst, "broker" to acct.name, "mode" to "mr"))) {
             is WoResult.Ok -> describeOrder(x.json, acct.name)
             is WoResult.Err -> "❌ ${x.why}"
